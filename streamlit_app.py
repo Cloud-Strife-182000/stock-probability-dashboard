@@ -4,6 +4,18 @@ import pandas as pd
 
 st.set_page_config(page_title="Stock Market Data", layout="wide")
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_stock_data(ticker, exch):
+    suffix = ".NS" if exch == "NSE" else ".BS"
+    sym = f"{ticker}{suffix}"
+    data = yf.download(sym, period="6mo", interval="1d", progress=False)
+    if data.empty and exch == "BSE":
+        sym_bo = f"{ticker}.BO"
+        data = yf.download(sym_bo, period="6mo", interval="1d", progress=False)
+        if not data.empty:
+            sym = sym_bo
+    return data, sym
+
 st.title("Indian Stock Market Price Viewer")
 
 # Search Bar and Exchange Dropdown
@@ -16,28 +28,13 @@ with col2:
     exchange = st.selectbox("Select Exchange:", ["NSE", "BSE"])
 
 if ticker_input:
-    # Append suffix based on selected exchange
-    suffix = ".NS" if exchange == "NSE" else ".BS"
-    symbol = f"{ticker_input}{suffix}"
-    
-    with st.spinner(f"Fetching data and calculating indicators for {symbol}..."):
+    with st.spinner(f"Fetching data and calculating indicators for {ticker_input}..."):
         try:
-            # Fetch 6 months of data to calculate indicators accurately (like 50-day SMA)
-            data = yf.download(symbol, period="6mo", interval="1d", progress=False)
+            data, symbol = fetch_stock_data(ticker_input, exchange)
             
             if data.empty:
-                # Yahoo Finance uses .BO for BSE often, fallback if .BS returns empty
-                if exchange == "BSE":
-                    symbol_bo = f"{ticker_input}.BO"
-                    data = yf.download(symbol_bo, period="6mo", interval="1d", progress=False)
-                    if data.empty:
-                        st.warning(f"No data found for {symbol} or {symbol_bo}. Please check the ticker symbol.")
-                        st.stop()
-                    else:
-                        symbol = symbol_bo # Use .BO since .BS was empty
-                else:
-                    st.warning(f"No data found for {symbol}. Please check the ticker symbol.")
-                    st.stop()
+                st.warning(f"No data found for {ticker_input}. Please check the ticker symbol.")
+                st.stop()
             
             # Handle MultiIndex columns if present (newer yfinance versions)
             df = data.copy()
