@@ -290,8 +290,15 @@ if ticker_input:
                 # Display ML Prediction Card
                 if bullish_prob is not None:
                     prob_pct = bullish_prob * 100
-                    ml_color = "#00C073" if prob_pct >= 50 else "#FF2B2B"
-                    ml_bg_color = "rgba(0, 192, 115, 0.05)" if prob_pct >= 50 else "rgba(255, 43, 43, 0.05)"
+                    if prob_pct >= 55:
+                        ml_color = "#00C073" # Green
+                        ml_bg_color = "rgba(0, 192, 115, 0.05)"
+                    elif prob_pct <= 45:
+                        ml_color = "#FF2B2B" # Red
+                        ml_bg_color = "rgba(255, 43, 43, 0.05)"
+                    else:
+                        ml_color = "#FFB92B" # Yellow
+                        ml_bg_color = "rgba(255, 185, 43, 0.05)"
                     
                     st.markdown(
                         f"""
