@@ -2,6 +2,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
 
 st.set_page_config(page_title="Stock Market Data", layout="wide")
 
@@ -188,6 +189,13 @@ if ticker_input:
                     y = ml_df['Target']
                     
                     try:
+                        # Calculate out-of-sample accuracy using a time-series strict train/test split
+                        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
+                        eval_model = RandomForestClassifier(n_estimators=100, random_state=42)
+                        eval_model.fit(X_train, y_train)
+                        test_accuracy = eval_model.score(X_test, y_test)
+                        
+                        # Train production model on ALL data for tomorrow's prediction
                         model = RandomForestClassifier(n_estimators=100, random_state=42)
                         model.fit(X, y)
                         
@@ -203,7 +211,7 @@ if ticker_input:
                                 bullish_prob = 1.0 if model.classes_[0] == 1 else 0.0
                                 
                             ml_details = {
-                                "accuracy": model.score(X, y),
+                                "accuracy": test_accuracy,
                                 "samples": len(ml_df),
                                 "importances": {
                                     "SMA 20": model.feature_importances_[0],
@@ -329,7 +337,7 @@ if ticker_input:
                         
                         with st.expander("View Machine Learning Model Details", expanded=False):
                             st.markdown(f"**Training Set Size:** {ml_details['samples']} market days")
-                            st.markdown(f"**Historical Fit Accuracy:** {ml_details['accuracy']*100:.1f}% (Training Score)")
+                            st.markdown(f"**Predictive Accuracy:** {ml_details['accuracy']*100:.1f}% (Recent 20% Out-of-Sample Test)")
                             
                             st.markdown("**Feature Importances:**")
                             # Create a clean dictionary to dataframe mapping natively supported by Streamlit bar_chart
