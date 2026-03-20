@@ -181,6 +181,7 @@ if ticker_input:
                 
                 bullish_prob = None
                 ml_details = None
+                ml_pred_label = ""
                 ml_df = df[['SMA_20', 'SMA_50', 'RSI_14', 'MACD', 'Target']].dropna()
                 if len(ml_df) > 10:
                     X = ml_df[['SMA_20', 'SMA_50', 'RSI_14', 'MACD']]
@@ -193,6 +194,9 @@ if ticker_input:
                         today_features = df.iloc[-1][['SMA_20', 'SMA_50', 'RSI_14', 'MACD']].to_frame().T
                         if not today_features.isna().any().any():
                             prob = model.predict_proba(today_features)[0]
+                            pred_class = model.predict(today_features)[0]
+                            ml_pred_label = "BULLISH" if pred_class == 1.0 else "BEARISH"
+                            
                             if len(model.classes_) == 2:
                                 bullish_prob = prob[1]
                             else:
@@ -304,7 +308,7 @@ if ticker_input:
                         f"""
                         <div style="text-align: center; padding: 1.5rem; border-radius: 10px; background-color: {ml_bg_color}; border: 1px solid {ml_color}; margin-top: 2rem; margin-bottom: 0.5rem;">
                             <h4 style="margin-bottom: 0px; margin-top: 0px; color: black; font-weight: 600;">Next-Day Bullish Probability</h4>
-                            <h1 style="color: {ml_color}; font-size: 3rem; margin: 5px 0px;">{prob_pct:.1f}%</h1>
+                            <h1 style="color: {ml_color}; font-size: 3rem; margin: 5px 0px;">{prob_pct:.1f}% <span style="font-size: 1.5rem; font-weight: 400;">({ml_pred_label})</span></h1>
                             <p style="color: {ml_color}; font-size: 1rem; margin-top: 0px;"><em>Powered by scikit-learn RandomForestClassifier</em></p>
                         </div>
                         """,
