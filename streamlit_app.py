@@ -1,6 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
 
 st.set_page_config(page_title="Stock Market Data", layout="wide")
 
@@ -74,6 +75,11 @@ if ticker_input:
                 df['MACD'] = ema_12 - ema_26
                 df['MACD_Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
                 df['MACD_Hist'] = df['MACD'] - df['MACD_Signal']
+                
+                # --- Machine Learning Target Preparation ---
+                df['Target'] = (df['Close'].shift(-1) > df['Close']).astype(float)
+                if len(df) > 0:
+                    df.iloc[-1, df.columns.get_loc('Target')] = float('nan')
             
             # We skip the table as requested and go straight to visually attractive indicators
             st.markdown("---")
@@ -173,6 +179,26 @@ if ticker_input:
                 # Dynamic Signal Generation entirely based on interactive tile toggles
                 st.markdown("<br><br>", unsafe_allow_html=True)
                 
+                bullish_prob = None
+                ml_df = df[['SMA_20', 'SMA_50', 'RSI_14', 'MACD', 'Target']].dropna()
+                if len(ml_df) > 10:
+                    X = ml_df[['SMA_20', 'SMA_50', 'RSI_14', 'MACD']]
+                    y = ml_df['Target']
+                    
+                    try:
+                        model = RandomForestClassifier(n_estimators=100, random_state=42)
+                        model.fit(X, y)
+                        
+                        today_features = df.iloc[-1][['SMA_20', 'SMA_50', 'RSI_14', 'MACD']].to_frame().T
+                        if not today_features.isna().any().any():
+                            prob = model.predict_proba(today_features)[0]
+                            if len(model.classes_) == 2:
+                                bullish_prob = prob[1]
+                            else:
+                                bullish_prob = 1.0 if model.classes_[0] == 1 else 0.0
+                    except Exception as e:
+                        print("ML Training error:", e)
+                
                 signals = []
                 reasons = []
                 included_names = []
@@ -236,6 +262,23 @@ if ticker_input:
                         signal = "HOLD"
                         signal_color = "#AAAAAA"
                         final_reason = "Insufficient data to compute signal."
+                            
+                # Display ML Prediction Card
+                if bullish_prob is not None:
+                    prob_pct = bullish_prob * 100
+                    ml_color = "#00C073" if prob_pct >= 50 else "#FF2B2B"
+                    ml_bg_color = "rgba(0, 192, 115, 0.05)" if prob_pct >= 50 else "rgba(255, 43, 43, 0.05)"
+                    
+                    st.markdown(
+                        f"""
+                        <div style="text-align: center; padding: 1.5rem; border-radius: 10px; background-color: {ml_bg_color}; border: 1px solid {ml_color}; margin-top: 2rem;">
+                            <h4 style="margin-bottom: 0px; margin-top: 0px; color: #888; font-weight: normal;">Next-Day Bullish Probability</h4>
+                            <h1 style="color: {ml_color}; font-size: 3rem; margin: 5px 0px;">{prob_pct:.1f}%</h1>
+                            <p style="color: {ml_color}; font-size: 1rem; margin-top: 0px;"><em>Powered by scikit-learn RandomForestClassifier</em></p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
                             
                 # Display beautifully centered Signal Card
                 st.markdown(
