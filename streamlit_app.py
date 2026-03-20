@@ -275,6 +275,18 @@ if ticker_input:
                         signal_color = "#AAAAAA"
                         final_reason = "Insufficient data to compute signal."
                             
+                # Display beautifully centered Signal Card
+                st.markdown(
+                    f"""
+                    <div style="text-align: center; padding: 2rem; border-radius: 10px; background-color: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); margin-top: 1rem;">
+                        <h4 style="margin-bottom: 0px; margin-top: 0px; color: #888; font-weight: normal;">Long Term Trading Signal</h4>
+                        <h1 style="color: {signal_color}; font-size: 3.5rem; margin: 10px 0px;">{signal}</h1>
+                        <p style="color: gray; font-size: 1.1rem; margin-top: 0px;">{final_reason}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+                            
                 # Display ML Prediction Card
                 if bullish_prob is not None:
                     prob_pct = bullish_prob * 100
@@ -316,18 +328,6 @@ if ticker_input:
                                 columns=["Relative Importance"]
                             )
                             st.bar_chart(fi_df, height=200)
-                            
-                # Display beautifully centered Signal Card
-                st.markdown(
-                    f"""
-                    <div style="text-align: center; padding: 2rem; border-radius: 10px; background-color: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); margin-top: 1rem;">
-                        <h4 style="margin-bottom: 0px; margin-top: 0px; color: #888; font-weight: normal;">Long Term Trading Signal</h4>
-                        <h1 style="color: {signal_color}; font-size: 3.5rem; margin: 10px 0px;">{signal}</h1>
-                        <p style="color: gray; font-size: 1.1rem; margin-top: 0px;">{final_reason}</p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
                 
         except Exception as e:
             st.error(f"An error occurred while fetching data: {e}")
