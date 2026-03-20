@@ -293,36 +293,29 @@ if ticker_input:
                     )
                     
                     if ml_details:
-                        with st.expander("📊 View Machine Learning Model Details", expanded=False):
-                            st.markdown("<h4 style='text-align: center; color: #888; font-weight: normal; margin-top: 10px;'>Model Performance Metrics</h4>", unsafe_allow_html=True)
+                        # Inject CSS to make the specific Expander title big and black
+                        st.markdown("""
+                            <style>
+                            div[data-testid="stExpander"] details summary p {
+                                font-size: 22px !important;
+                                color: black !important;
+                                font-weight: 600 !important;
+                            }
+                            </style>
+                        """, unsafe_allow_html=True)
+                        
+                        with st.expander("View Machine Learning Model Details", expanded=False):
+                            st.markdown(f"**Training Set Size:** {ml_details['samples']} market days")
+                            st.markdown(f"**Historical Fit Accuracy:** {ml_details['accuracy']*100:.1f}% (Training Score)")
                             
-                            met1, met2 = st.columns(2)
-                            
-                            with met1:
-                                st.markdown(f"""
-                                <div style="background-color: rgba(255,255,255,0.03); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid rgba(255,255,255,0.05);">
-                                    <p style="margin:0; font-size:14px; color:#888;">Training Context</p>
-                                    <h2 style="margin:5px 0; font-size:24px; color:#ddd;">{ml_details['samples']} Days</h2>
-                                </div>
-                                """, unsafe_allow_html=True)
-                                
-                            with met2:
-                                st.markdown(f"""
-                                <div style="background-color: rgba(255,255,255,0.03); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid rgba(255,255,255,0.05);">
-                                    <p style="margin:0; font-size:14px; color:#888;">Historical Accuracy</p>
-                                    <h2 style="margin:5px 0; font-size:24px; color:#ddd;">{ml_details['accuracy']*100:.1f}%</h2>
-                                </div>
-                                """, unsafe_allow_html=True)
-                            
-                            st.markdown("<h4 style='text-align: center; color: #888; font-weight: normal; margin-top: 25px;'>Technical Feature Importances</h4>", unsafe_allow_html=True)
-                            
+                            st.markdown("**Feature Importances:**")
                             # Create a clean dictionary to dataframe mapping natively supported by Streamlit bar_chart
                             fi_df = pd.DataFrame(
                                 list(ml_details['importances'].values()),
                                 index=list(ml_details['importances'].keys()),
-                                columns=["Mathematical Weight"]
+                                columns=["Relative Importance"]
                             )
-                            st.bar_chart(fi_df, height=250)
+                            st.bar_chart(fi_df, height=200)
                             
                 # Display beautifully centered Signal Card
                 st.markdown(
