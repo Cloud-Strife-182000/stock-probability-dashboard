@@ -110,8 +110,6 @@ if ticker_input:
                 </div>
                 """
                 col.markdown(html, unsafe_allow_html=True)
-                col.markdown("<div style='height: 48px;'></div>", unsafe_allow_html=True) # visual alignment spacer
-                return True
 
             st.write("")
             
@@ -157,9 +155,6 @@ if ticker_input:
                 macd_diff_v = (macd_v - prev_day['MACD_Hist']) if pd.notna(macd_v) and pd.notna(prev_day['MACD_Hist']) else 0
                 macd_is_good = True if pd.notna(macd_v) and macd_v > 0 else (False if pd.notna(macd_v) and macd_v < 0 else None)
                 render_indicator(cols[4], "MACD Hist", macd_str, f"{macd_diff_v:+.2f}", macd_is_good)
-
-                # Dynamic Signal Generation entirely based on interactive tile toggles
-                st.markdown("<br><br>", unsafe_allow_html=True)
                 
                 bullish_prob = None
                 ml_details = None
