@@ -78,7 +78,8 @@ if ticker_input:
                 df['MACD_Hist'] = df['MACD'] - df['MACD_Signal']
                 
                 # --- Machine Learning Target Preparation ---
-                df['Target'] = (df['Close'].shift(-1) > df['Close']).astype(float)
+                # A bullish signal is only generated if the next day's close is at least 0.5% higher (hurdle for slippage/fees)
+                df['Target'] = (df['Close'].shift(-1) >= (df['Close'] * 1.005)).astype(float)
                 if len(df) > 0:
                     df.iloc[-1, df.columns.get_loc('Target')] = float('nan')
             
@@ -191,12 +192,12 @@ if ticker_input:
                     try:
                         # Calculate out-of-sample accuracy using a time-series strict train/test split
                         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
-                        eval_model = RandomForestClassifier(n_estimators=100, random_state=42)
+                        eval_model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=42)
                         eval_model.fit(X_train, y_train)
                         test_accuracy = eval_model.score(X_test, y_test)
                         
                         # Train production model on ALL data for tomorrow's prediction
-                        model = RandomForestClassifier(n_estimators=100, random_state=42)
+                        model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=42)
                         model.fit(X, y)
                         
                         today_features = df.iloc[-1][['SMA_20', 'SMA_50', 'RSI_14', 'MACD']].to_frame().T
