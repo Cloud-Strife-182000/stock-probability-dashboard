@@ -23,7 +23,7 @@ st.title("Stock Probability Dashboard")
 col1, col2 = st.columns([3, 1])
 
 with col1:
-    ticker_input = st.text_input("Enter Indian Ticker (e.g., TCS, ZOMATO):", "").strip().upper()
+    ticker_input = st.text_input("Enter Indian Ticker (e.g., PNB, BANKINDIA):", "").strip().upper()
 
 with col2:
     exchange = st.selectbox("Select Exchange:", ["NSE", "BSE"])
