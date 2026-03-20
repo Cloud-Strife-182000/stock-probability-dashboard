@@ -17,7 +17,7 @@ def fetch_stock_data(ticker, exch):
             sym = sym_bo
     return data, sym
 
-st.title("Indian Stock Market Price Viewer")
+st.title("Stock Probability Dashboard")
 
 # Search Bar and Exchange Dropdown
 col1, col2 = st.columns([3, 1])
