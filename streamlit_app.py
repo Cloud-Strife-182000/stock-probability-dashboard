@@ -77,13 +77,19 @@ if ticker_input:
             
             # We skip the table as requested and go straight to visually attractive indicators
             st.markdown("---")
+            # Initialize indicator state keys properly early so toggles feel instant
+            for k in ["use_rsi", "use_sma20", "use_sma50", "use_macd"]:
+                if k not in st.session_state:
+                    st.session_state[k] = True
+
             # Dynamic indicator rendering function for big colored square blocks
             def render_indicator(col, title, value, diff, is_good, state_key=None):
+                is_active = st.session_state.get(state_key, True) if state_key else True
+                
                 bg_color = "rgba(0, 192, 115, 0.15)" if is_good is True else ("rgba(255, 43, 43, 0.15)" if is_good is False else "rgba(128, 128, 128, 0.1)")
                 border_color = "#00C073" if is_good is True else ("#FF2B2B" if is_good is False else "gray")
                 text_color = border_color if is_good is not None else "black"
                 
-                is_active = st.session_state.get(state_key, True) if state_key else True
                 opacity = "1.0" if is_active else "0.3"
                 
                 html = f"""
@@ -96,10 +102,8 @@ if ticker_input:
                 col.markdown(html, unsafe_allow_html=True)
                 
                 if state_key:
-                    if state_key not in st.session_state:
-                        st.session_state[state_key] = True
                     # A sleek toggle switch natively underneath the colored card square
-                    st.session_state[state_key] = col.toggle("Include", value=st.session_state[state_key], key=f"tgl_{state_key}")
+                    col.toggle("Include", key=state_key)
                     return st.session_state[state_key]
                 else:
                     col.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) # visual alignment spacer
