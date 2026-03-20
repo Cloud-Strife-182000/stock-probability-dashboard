@@ -1,6 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import requests
 
 st.set_page_config(page_title="Stock Market Data", layout="wide")
 
@@ -19,11 +20,27 @@ def fetch_stock_data(ticker, exch):
             
     if not data.empty:
         try:
-            info = yf.Ticker(sym).info
-            if isinstance(info, dict) and len(info) == 0:
-                info = {"error_msg": "Yahoo Finance returned empty info dict."}
+            # Fallback to Wikipedia API to bypass Yahoo Finance rate limits
+            from urllib.parse import quote
+            search_query = f"{ticker} publicly traded company India"
+            search_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={quote(search_query)}&utf8=&format=json"
+            search_resp = requests.get(search_url, headers={"User-Agent": "StockDashboardApp/1.0"}).json()
+            
+            if search_resp.get('query', {}).get('search'):
+                title = search_resp['query']['search'][0]['title']
+                summary_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{quote(title)}"
+                summary_resp = requests.get(summary_url, headers={"User-Agent": "StockDashboardApp/1.0"}).json()
+                
+                info = {
+                    "longName": title,
+                    "sector": "Indian Equities", 
+                    "industry": "Public Company",
+                    "longBusinessSummary": summary_resp.get("extract", "No detailed description available on Wikipedia.")
+                }
+            else:
+                info = {"error_msg": "No Wikipedia entry found for this ticker."}
         except Exception as e:
-            info = {"error_msg": repr(e)}
+            info = {"error_msg": str(e)}
             
     return data, sym, info
 
