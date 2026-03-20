@@ -268,7 +268,7 @@ if ticker_input:
                             signal_color = "#FF2B2B" # Red
                         else:
                             signal = "HOLD"
-                            signal_color = "#FFB92B" # Yellow
+                            signal_color = "#D99300" # Darker Yellow
                         final_reason = f"<strong>Indicators Used:</strong> {', '.join(included_names)}<br><strong>Reasoning:</strong> {' | '.join(reasons)}" if reasons else "Mixed Signals"
                     else:
                         signal = "HOLD"
@@ -279,7 +279,7 @@ if ticker_input:
                 st.markdown(
                     f"""
                     <div style="text-align: center; padding: 2rem; border-radius: 10px; background-color: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); margin-top: 1rem;">
-                        <h4 style="margin-bottom: 0px; margin-top: 0px; color: #888; font-weight: normal;">Long Term Trading Signal</h4>
+                        <h4 style="margin-bottom: 0px; margin-top: 0px; color: black; font-weight: 600;">Long Term Trading Signal</h4>
                         <h1 style="color: {signal_color}; font-size: 3.5rem; margin: 10px 0px;">{signal}</h1>
                         <p style="color: gray; font-size: 1.1rem; margin-top: 0px;">{final_reason}</p>
                     </div>
@@ -297,13 +297,13 @@ if ticker_input:
                         ml_color = "#FF2B2B" # Red
                         ml_bg_color = "rgba(255, 43, 43, 0.05)"
                     else:
-                        ml_color = "#FFB92B" # Yellow
-                        ml_bg_color = "rgba(255, 185, 43, 0.05)"
+                        ml_color = "#D99300" # Darker Yellow
+                        ml_bg_color = "rgba(217, 147, 0, 0.05)"
                     
                     st.markdown(
                         f"""
                         <div style="text-align: center; padding: 1.5rem; border-radius: 10px; background-color: {ml_bg_color}; border: 1px solid {ml_color}; margin-top: 2rem; margin-bottom: 0.5rem;">
-                            <h4 style="margin-bottom: 0px; margin-top: 0px; color: #888; font-weight: normal;">Next-Day Bullish Probability</h4>
+                            <h4 style="margin-bottom: 0px; margin-top: 0px; color: black; font-weight: 600;">Next-Day Bullish Probability</h4>
                             <h1 style="color: {ml_color}; font-size: 3rem; margin: 5px 0px;">{prob_pct:.1f}%</h1>
                             <p style="color: {ml_color}; font-size: 1rem; margin-top: 0px;"><em>Powered by scikit-learn RandomForestClassifier</em></p>
                         </div>
