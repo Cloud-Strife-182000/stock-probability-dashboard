@@ -80,10 +80,8 @@ if ticker_input:
             
             # We skip the table as requested and go straight to visually attractive indicators
             st.markdown("---")
-            st.markdown(f"<h3 style='text-align: center; color: black;'>Technical Indicators for {symbol}</h3>", unsafe_allow_html=True)
-            
-            # Dynamic indicator rendering function for big colored square blocks
-            def render_indicator(col, title, value, diff, is_good, state_key=None):
+            # Dynamic indicator rendering function for big clickable CSS-styled buttons
+            def render_indicator(col_index, title, value, diff, is_good, state_key=None):
                 bg_color = "rgba(0, 192, 115, 0.15)" if is_good is True else ("rgba(255, 43, 43, 0.15)" if is_good is False else "rgba(128, 128, 128, 0.1)")
                 border_color = "#00C073" if is_good is True else ("#FF2B2B" if is_good is False else "gray")
                 text_color = border_color if is_good is not None else "black"
@@ -91,22 +89,47 @@ if ticker_input:
                 is_active = st.session_state.get(state_key, True) if state_key else True
                 opacity = "1.0" if is_active else "0.3"
                 
-                html = f"""
-                <div style="background-color: {bg_color}; border: 3px solid {border_color}; border-radius: 15px; padding: 15px 5px; text-align: center; height: 130px; margin-bottom: 10px; opacity: {opacity}; transition: opacity 0.3s; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                    <p style="margin:0; font-size:14px; font-weight:bold; color:#555;">{title}</p>
-                    <h2 style="margin:10px 0; font-size:26px; color:{text_color}; padding: 0px 5px;">{value}</h2>
-                    <p style="margin:0; font-size:13px; color:{text_color}; font-weight:bold;">{diff}</p>
-                </div>
+                css = f"""
+                <style>
+                div[data-testid="column"]:nth-of-type({col_index}) button {{
+                    background-color: {bg_color} !important;
+                    border: 3px solid {border_color} !important;
+                    border-radius: 15px !important;
+                    height: 140px !important;
+                    opacity: {opacity} !important;
+                    transition: all 0.2s ease-in-out !important;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
+                    padding: 10px !important;
+                }}
+                div[data-testid="column"]:nth-of-type({col_index}) button:hover {{
+                    transform: scale(1.02);
+                }}
+                div[data-testid="column"]:nth-of-type({col_index}) button p {{
+                    font-size: 18px !important;
+                    color: {text_color} !important;
+                    white-space: pre-wrap !important;
+                    text-align: center !important;
+                    line-height: 1.4 !important;
+                }}
+                </style>
                 """
-                col.markdown(html, unsafe_allow_html=True)
+                st.markdown(css, unsafe_allow_html=True)
+                
+                # We use Markdown styling inside the button text that streamliner renders
+                button_label = f"**{title}**\n\n{value}\n\n{diff}"
                 
                 if state_key:
                     if state_key not in st.session_state:
                         st.session_state[state_key] = True
-                    # A sleek toggle switch natively underneath the colored card square
-                    st.session_state[state_key] = col.toggle("Include", value=st.session_state[state_key], key=f"tgl_{state_key}")
+                    
+                    if cols[col_index-1].button(button_label, key=f"btn_{state_key}", use_container_width=True):
+                        st.session_state[state_key] = not st.session_state[state_key]
+                        st.rerun()
                     return st.session_state[state_key]
-                return True
+                else:
+                    # Non-toggleable button for Current Price
+                    cols[col_index-1].button(button_label, key="btn_price", use_container_width=True)
+                    return True
 
             st.write("")
             
@@ -122,7 +145,7 @@ if ticker_input:
                 change_price = latest_day['Change'] if 'Change' in df.columns else 0
                 change_pct = f"{latest_day['Change %']:.2f}%" if 'Change %' in df.columns and pd.notna(latest_day['Change %']) else ""
                 price_is_good = True if change_price > 0 else (False if change_price < 0 else None)
-                render_indicator(cols[0], "Current Price", close_val, change_pct, price_is_good, None)
+                render_indicator(1, "Current Price", close_val, change_pct, price_is_good, None)
                 
                 # RSI 14
                 rsi_v = latest_day['RSI_14'] if 'RSI_14' in df.columns else None
@@ -130,7 +153,7 @@ if ticker_input:
                 rsi_diff_v = (rsi_v - prev_day['RSI_14']) if pd.notna(rsi_v) and pd.notna(prev_day['RSI_14']) else 0
                 rsi_diff_str = f"{rsi_diff_v:+.2f}"
                 rsi_is_good = True if pd.notna(rsi_v) and rsi_v < 40 else (False if pd.notna(rsi_v) and rsi_v > 60 else None)
-                use_rsi = render_indicator(cols[1], "RSI (14)", rsi_str, rsi_diff_str, rsi_is_good, "use_rsi")
+                use_rsi = render_indicator(2, "RSI (14)", rsi_str, rsi_diff_str, rsi_is_good, "use_rsi")
                 
                 # SMA 20
                 sma20_v = latest_day['SMA_20'] if 'SMA_20' in df.columns else None
@@ -138,20 +161,20 @@ if ticker_input:
                 sma20_str = f"₹{sma20_v:.2f}" if pd.notna(sma20_v) else "N/A"
                 sma20_diff_v = (sma20_v - prev_day['SMA_20']) if pd.notna(sma20_v) and pd.notna(prev_day['SMA_20']) else 0
                 sma20_is_good = True if pd.notna(sma20_v) and pd.notna(sma50_v) and sma20_v > sma50_v else (False if pd.notna(sma20_v) and pd.notna(sma50_v) and sma20_v < sma50_v else None)
-                use_sma20 = render_indicator(cols[2], "SMA (20)", sma20_str, f"{sma20_diff_v:+.2f}", sma20_is_good, "use_sma20")
+                use_sma20 = render_indicator(3, "SMA (20)", sma20_str, f"{sma20_diff_v:+.2f}", sma20_is_good, "use_sma20")
                 
                 # SMA 50
                 sma50_str = f"₹{sma50_v:.2f}" if pd.notna(sma50_v) else "N/A"
                 sma50_diff_v = (sma50_v - prev_day['SMA_50']) if pd.notna(sma50_v) and pd.notna(prev_day['SMA_50']) else 0
                 sma50_is_good = True if 'Close' in df.columns and pd.notna(sma50_v) and latest_day['Close'] > sma50_v else (False if 'Close' in df.columns and pd.notna(sma50_v) and latest_day['Close'] < sma50_v else None)
-                use_sma50 = render_indicator(cols[3], "SMA (50)", sma50_str, f"{sma50_diff_v:+.2f}", sma50_is_good, "use_sma50")
+                use_sma50 = render_indicator(4, "SMA (50)", sma50_str, f"{sma50_diff_v:+.2f}", sma50_is_good, "use_sma50")
                 
                 # MACD
                 macd_v = latest_day['MACD_Hist'] if 'MACD_Hist' in df.columns else None
                 macd_str = f"{macd_v:.2f}" if pd.notna(macd_v) else "N/A"
                 macd_diff_v = (macd_v - prev_day['MACD_Hist']) if pd.notna(macd_v) and pd.notna(prev_day['MACD_Hist']) else 0
                 macd_is_good = True if pd.notna(macd_v) and macd_v > 0 else (False if pd.notna(macd_v) and macd_v < 0 else None)
-                use_macd = render_indicator(cols[4], "MACD Hist", macd_str, f"{macd_diff_v:+.2f}", macd_is_good, "use_macd")
+                use_macd = render_indicator(5, "MACD Hist", macd_str, f"{macd_diff_v:+.2f}", macd_is_good, "use_macd")
 
                 # Dynamic Signal Generation entirely based on interactive tile toggles
                 st.markdown("<br><br>", unsafe_allow_html=True)
