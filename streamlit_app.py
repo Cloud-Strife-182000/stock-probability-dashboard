@@ -180,6 +180,7 @@ if ticker_input:
                 st.markdown("<br><br>", unsafe_allow_html=True)
                 
                 bullish_prob = None
+                ml_details = None
                 ml_df = df[['SMA_20', 'SMA_50', 'RSI_14', 'MACD', 'Target']].dropna()
                 if len(ml_df) > 10:
                     X = ml_df[['SMA_20', 'SMA_50', 'RSI_14', 'MACD']]
@@ -196,6 +197,17 @@ if ticker_input:
                                 bullish_prob = prob[1]
                             else:
                                 bullish_prob = 1.0 if model.classes_[0] == 1 else 0.0
+                                
+                            ml_details = {
+                                "accuracy": model.score(X, y),
+                                "samples": len(ml_df),
+                                "importances": {
+                                    "SMA 20": model.feature_importances_[0],
+                                    "SMA 50": model.feature_importances_[1],
+                                    "RSI (14)": model.feature_importances_[2],
+                                    "MACD": model.feature_importances_[3]
+                                }
+                            }
                     except Exception as e:
                         print("ML Training error:", e)
                 
@@ -271,7 +283,7 @@ if ticker_input:
                     
                     st.markdown(
                         f"""
-                        <div style="text-align: center; padding: 1.5rem; border-radius: 10px; background-color: {ml_bg_color}; border: 1px solid {ml_color}; margin-top: 2rem;">
+                        <div style="text-align: center; padding: 1.5rem; border-radius: 10px; background-color: {ml_bg_color}; border: 1px solid {ml_color}; margin-top: 2rem; margin-bottom: 0.5rem;">
                             <h4 style="margin-bottom: 0px; margin-top: 0px; color: #888; font-weight: normal;">Next-Day Bullish Probability</h4>
                             <h1 style="color: {ml_color}; font-size: 3rem; margin: 5px 0px;">{prob_pct:.1f}%</h1>
                             <p style="color: {ml_color}; font-size: 1rem; margin-top: 0px;"><em>Powered by scikit-learn RandomForestClassifier</em></p>
@@ -279,6 +291,20 @@ if ticker_input:
                         """,
                         unsafe_allow_html=True
                     )
+                    
+                    if ml_details:
+                        with st.expander("📊 View Machine Learning Model Details"):
+                            st.markdown(f"**Training Set Size:** {ml_details['samples']} market days")
+                            st.markdown(f"**Historical Fit Accuracy:** {ml_details['accuracy']*100:.1f}% (Training Score)")
+                            
+                            st.markdown("**Feature Importances:**")
+                            # Create a clean dictionary to dataframe mapping natively supported by Streamlit bar_chart
+                            fi_df = pd.DataFrame(
+                                list(ml_details['importances'].values()),
+                                index=list(ml_details['importances'].keys()),
+                                columns=["Relative Importance"]
+                            )
+                            st.bar_chart(fi_df, height=200)
                             
                 # Display beautifully centered Signal Card
                 st.markdown(
