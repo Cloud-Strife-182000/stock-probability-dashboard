@@ -335,6 +335,14 @@ if ticker_input:
                                 columns=["Relative Importance"]
                             )
                             st.bar_chart(fi_df, height=200)
+                            
+                        with st.expander("View Raw Machine Learning Training Data", expanded=False):
+                            st.markdown("This historical data matrix was aggressively fed into the `scikit-learn` algorithm to train its prediction trees:")
+                            display_df = ml_df.copy()
+                            if 'Date' in df.columns:
+                                display_df['Date'] = df.loc[display_df.index, 'Date']
+                                display_df = display_df.set_index('Date')
+                            st.dataframe(display_df, use_container_width=True)
                 
         except Exception as e:
             st.error(f"An error occurred while fetching data: {e}")
