@@ -20,8 +20,10 @@ def fetch_stock_data(ticker, exch):
     if not data.empty:
         try:
             info = yf.Ticker(sym).info
-        except Exception:
-            pass
+            if isinstance(info, dict) and len(info) == 0:
+                info = {"error_msg": "Yahoo Finance returned empty info dict."}
+        except Exception as e:
+            info = {"error_msg": repr(e)}
             
     return data, sym, info
 
@@ -46,7 +48,10 @@ if ticker_input:
                 st.stop()
                 
             # --- Display Company Info Card ---
-            if info and isinstance(info, dict) and len(info) > 0:
+            if info and "error_msg" in info:
+                st.warning(f"Note: Detailed company profile could not be retrieved from Yahoo Finance ({info['error_msg']})")
+                
+            elif info and isinstance(info, dict) and len(info) > 0:
                 name = info.get('longName', symbol)
                 sector = info.get('sector', 'N/A')
                 industry = info.get('industry', 'N/A')
