@@ -283,7 +283,7 @@ if ticker_input:
                 st.markdown(
                     f"""
                     <div style="text-align: center; padding: 2rem; border-radius: 10px; background-color: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); margin-top: 1rem;">
-                        <h4 style="margin-bottom: 0px; margin-top: 0px; color: black; font-weight: 600;">Long Term Trading Signal</h4>
+                        <h4 style="margin-bottom: 0px; margin-top: 0px; color: black; font-weight: 600;">Medium-Term Swing Signal</h4>
                         <h1 style="color: {signal_color}; font-size: 3.5rem; margin: 10px 0px;">{signal}</h1>
                         <p style="color: gray; font-size: 1.1rem; margin-top: 0px;">{final_reason}</p>
                     </div>
