@@ -1,7 +1,6 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import requests
 
 st.set_page_config(page_title="Stock Market Data", layout="wide")
 
@@ -10,39 +9,12 @@ def fetch_stock_data(ticker, exch):
     suffix = ".NS" if exch == "NSE" else ".BS"
     sym = f"{ticker}{suffix}"
     data = yf.download(sym, period="6mo", interval="1d", progress=False)
-    
-    info = {}
     if data.empty and exch == "BSE":
         sym_bo = f"{ticker}.BO"
         data = yf.download(sym_bo, period="6mo", interval="1d", progress=False)
         if not data.empty:
             sym = sym_bo
-            
-    if not data.empty:
-        try:
-            # Fallback to Wikipedia API to bypass Yahoo Finance rate limits
-            from urllib.parse import quote
-            search_query = f"{ticker} publicly traded company India"
-            search_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={quote(search_query)}&utf8=&format=json"
-            search_resp = requests.get(search_url, headers={"User-Agent": "StockDashboardApp/1.0"}).json()
-            
-            if search_resp.get('query', {}).get('search'):
-                title = search_resp['query']['search'][0]['title']
-                summary_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{quote(title)}"
-                summary_resp = requests.get(summary_url, headers={"User-Agent": "StockDashboardApp/1.0"}).json()
-                
-                info = {
-                    "longName": title,
-                    "sector": "Indian Equities", 
-                    "industry": "Public Company",
-                    "longBusinessSummary": summary_resp.get("extract", "No detailed description available on Wikipedia.")
-                }
-            else:
-                info = {"error_msg": "No Wikipedia entry found for this ticker."}
-        except Exception as e:
-            info = {"error_msg": str(e)}
-            
-    return data, sym, info
+    return data, sym
 
 st.title("Indian Stock Market Price Viewer")
 
@@ -58,38 +30,11 @@ with col2:
 if ticker_input:
     with st.spinner(f"Fetching data and calculating indicators for {ticker_input}..."):
         try:
-            data, symbol, info = fetch_stock_data(ticker_input, exchange)
+            data, symbol = fetch_stock_data(ticker_input, exchange)
             
             if data.empty:
                 st.warning(f"No data found for {ticker_input}. Please check the ticker symbol.")
                 st.stop()
-                
-            # --- Display Company Info Card ---
-            if info and "error_msg" in info:
-                st.warning(f"Note: Detailed company profile could not be retrieved from Yahoo Finance ({info['error_msg']})")
-                
-            elif info and isinstance(info, dict) and len(info) > 0:
-                name = info.get('longName', symbol)
-                sector = info.get('sector', 'N/A')
-                industry = info.get('industry', 'N/A')
-                summary = info.get('longBusinessSummary') or info.get('description', '')
-                
-                # Truncate summary if too long for a clean UI
-                if len(summary) > 400:
-                    summary = summary[:397] + "..."
-                
-                # Render beautifully styled aesthetic company card
-                st.markdown(f"""
-                <div style="background-color: rgba(0, 192, 115, 0.05); border-left: 4px solid #00C073; padding: 20px; border-radius: 0 10px 10px 0; margin-bottom: 25px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-                    <h2 style="margin-top: 0; color: #444; font-size: 24px; font-weight: 600;">{name}</h2>
-                    <p style="color: #666; font-size: 14px; margin-bottom: 12px; font-weight: 500;">
-                        <span style="color: #888;">Sector:</span> {sector} &nbsp;&nbsp;|&nbsp;&nbsp; <span style="color: #888;">Industry:</span> {industry}
-                    </p>
-                    <p style="color: #555; font-size: 15px; line-height: 1.6; margin-bottom: 0;">
-                        {summary}
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
             
             # Handle MultiIndex columns if present (newer yfinance versions)
             df = data.copy()
