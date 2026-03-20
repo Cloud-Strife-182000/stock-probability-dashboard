@@ -85,10 +85,6 @@ if ticker_input:
             
             # We skip the table as requested and go straight to visually attractive indicators
             st.markdown("---")
-            # Initialize indicator state keys properly early so toggles feel instant
-            for k in ["use_rsi", "use_sma20", "use_sma50", "use_macd"]:
-                if k not in st.session_state:
-                    st.session_state[k] = True
 
             # Global CSS to perfectly align all toggle switches in the center
             st.markdown("""
@@ -97,41 +93,25 @@ if ticker_input:
                     display: flex;
                     justify-content: center;
                 }
-                div[data-testid="stCheckbox"] {
-                    display: flex;
-                    justify-content: center;
-                    margin: 0 auto;
-                }
                 </style>
             """, unsafe_allow_html=True)
             
             # Dynamic indicator rendering function for big colored square blocks
-            def render_indicator(col, title, value, diff, is_good, state_key=None, toggle_text=None):
-                is_active = st.session_state.get(state_key, True) if state_key else True
-                
+            def render_indicator(col, title, value, diff, is_good):
                 bg_color = "rgba(0, 192, 115, 0.15)" if is_good is True else ("rgba(255, 43, 43, 0.15)" if is_good is False else "rgba(128, 128, 128, 0.1)")
                 border_color = "#00C073" if is_good is True else ("#FF2B2B" if is_good is False else "gray")
                 text_color = border_color if is_good is not None else "black"
                 
-                opacity = "1.0" if is_active else "0.3"
-                
                 html = f"""
-                <div style="background-color: {bg_color}; border: 3px solid {border_color}; border-radius: 15px; padding: 15px 5px; text-align: center; height: 130px; margin-bottom: 5px; opacity: {opacity}; transition: opacity 0.3s; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <div style="background-color: {bg_color}; border: 3px solid {border_color}; border-radius: 15px; padding: 15px 5px; text-align: center; height: 130px; margin-bottom: 5px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                     <p style="margin:0; font-size:14px; font-weight:bold; color:#555;">{title}</p>
                     <h2 style="margin:10px 0; font-size:26px; color:{text_color}; padding: 0px 5px;">{value}</h2>
                     <p style="margin:0; font-size:13px; color:{text_color}; font-weight:bold;">{diff}</p>
                 </div>
                 """
                 col.markdown(html, unsafe_allow_html=True)
-                
-                if state_key:
-                    # Sleek toggle switch with explicit name natively underneath the colored card square
-                    toggle_name = toggle_text if toggle_text else "Include"
-                    col.toggle(toggle_name, key=state_key)
-                    return st.session_state[state_key]
-                else:
-                    col.markdown("<div style='height: 48px;'></div>", unsafe_allow_html=True) # visual alignment spacer
-                    return True
+                col.markdown("<div style='height: 48px;'></div>", unsafe_allow_html=True) # visual alignment spacer
+                return True
 
             st.write("")
             
@@ -147,7 +127,7 @@ if ticker_input:
                 change_price = latest_day['Change'] if 'Change' in df.columns else 0
                 change_pct = f"{latest_day['Change %']:.2f}%" if 'Change %' in df.columns and pd.notna(latest_day['Change %']) else ""
                 price_is_good = True if change_price > 0 else (False if change_price < 0 else None)
-                render_indicator(cols[0], "Current Price", close_val, change_pct, price_is_good, None)
+                render_indicator(cols[0], "Current Price", close_val, change_pct, price_is_good)
                 
                 # RSI 14
                 rsi_v = latest_day['RSI_14'] if 'RSI_14' in df.columns else None
@@ -155,7 +135,7 @@ if ticker_input:
                 rsi_diff_v = (rsi_v - prev_day['RSI_14']) if pd.notna(rsi_v) and pd.notna(prev_day['RSI_14']) else 0
                 rsi_diff_str = f"{rsi_diff_v:+.2f}"
                 rsi_is_good = True if pd.notna(rsi_v) and rsi_v < 40 else (False if pd.notna(rsi_v) and rsi_v > 60 else None)
-                use_rsi = render_indicator(cols[1], "RSI (14)", rsi_str, rsi_diff_str, rsi_is_good, "use_rsi", "Include RSI")
+                render_indicator(cols[1], "RSI (14)", rsi_str, rsi_diff_str, rsi_is_good)
                 
                 # SMA 20
                 sma20_v = latest_day['SMA_20'] if 'SMA_20' in df.columns else None
@@ -163,20 +143,20 @@ if ticker_input:
                 sma20_str = f"₹{sma20_v:.2f}" if pd.notna(sma20_v) else "N/A"
                 sma20_diff_v = (sma20_v - prev_day['SMA_20']) if pd.notna(sma20_v) and pd.notna(prev_day['SMA_20']) else 0
                 sma20_is_good = True if pd.notna(sma20_v) and pd.notna(sma50_v) and sma20_v > sma50_v else (False if pd.notna(sma20_v) and pd.notna(sma50_v) and sma20_v < sma50_v else None)
-                use_sma20 = render_indicator(cols[2], "SMA (20)", sma20_str, f"{sma20_diff_v:+.2f}", sma20_is_good, "use_sma20", "Include SMA 20")
+                render_indicator(cols[2], "SMA (20)", sma20_str, f"{sma20_diff_v:+.2f}", sma20_is_good)
                 
                 # SMA 50
                 sma50_str = f"₹{sma50_v:.2f}" if pd.notna(sma50_v) else "N/A"
                 sma50_diff_v = (sma50_v - prev_day['SMA_50']) if pd.notna(sma50_v) and pd.notna(prev_day['SMA_50']) else 0
                 sma50_is_good = True if 'Close' in df.columns and pd.notna(sma50_v) and latest_day['Close'] > sma50_v else (False if 'Close' in df.columns and pd.notna(sma50_v) and latest_day['Close'] < sma50_v else None)
-                use_sma50 = render_indicator(cols[3], "SMA (50)", sma50_str, f"{sma50_diff_v:+.2f}", sma50_is_good, "use_sma50", "Include SMA 50")
+                render_indicator(cols[3], "SMA (50)", sma50_str, f"{sma50_diff_v:+.2f}", sma50_is_good)
                 
                 # MACD
                 macd_v = latest_day['MACD_Hist'] if 'MACD_Hist' in df.columns else None
                 macd_str = f"{macd_v:.2f}" if pd.notna(macd_v) else "N/A"
                 macd_diff_v = (macd_v - prev_day['MACD_Hist']) if pd.notna(macd_v) and pd.notna(prev_day['MACD_Hist']) else 0
                 macd_is_good = True if pd.notna(macd_v) and macd_v > 0 else (False if pd.notna(macd_v) and macd_v < 0 else None)
-                use_macd = render_indicator(cols[4], "MACD Hist", macd_str, f"{macd_diff_v:+.2f}", macd_is_good, "use_macd", "Include MACD")
+                render_indicator(cols[4], "MACD Hist", macd_str, f"{macd_diff_v:+.2f}", macd_is_good)
 
                 # Dynamic Signal Generation entirely based on interactive tile toggles
                 st.markdown("<br><br>", unsafe_allow_html=True)
@@ -228,65 +208,60 @@ if ticker_input:
                 reasons = []
                 included_names = []
                 
-                if not (use_rsi or use_sma20 or use_sma50 or use_macd):
-                    signal = "NONE"
-                    signal_color = "#AAAAAA"
-                    final_reason = "Please selectively enable at least one indicator."
-                else:
-                    if use_sma20 and pd.notna(sma20_v) and pd.notna(sma50_v):
-                        included_names.append("SMA 20")
-                        if sma20_v > sma50_v:
-                            signals.append(1)
-                            reasons.append("SMA20 > SMA50")
-                        else:
-                            signals.append(-1)
-                            reasons.append("SMA20 < SMA50")
-                            
-                    if use_sma50 and pd.notna(sma50_v) and 'Close' in df.columns:
-                        included_names.append("SMA 50")
-                        if latest_day['Close'] > sma50_v:
-                            signals.append(1)
-                            reasons.append("Price > SMA50")
-                        else:
-                            signals.append(-1)
-                            reasons.append("Price < SMA50")
-                            
-                    if use_rsi and pd.notna(rsi_v):
-                        included_names.append("RSI")
-                        if rsi_v < 40:
-                            signals.append(1)
-                            reasons.append("RSI Bullish")
-                        elif rsi_v > 60:
-                            signals.append(-1)
-                            reasons.append("RSI Bearish")
-                        else:
-                            signals.append(0)
-                            
-                    if use_macd and pd.notna(macd_v):
-                        included_names.append("MACD")
-                        if macd_v > 0:
-                            signals.append(1)
-                            reasons.append("MACD Bullish")
-                        else:
-                            signals.append(-1)
-                            reasons.append("MACD Bearish")
-                            
-                    if len(signals) > 0:
-                        total_score = sum(signals)
-                        if total_score > 0:
-                            signal = "BUY"
-                            signal_color = "#00C073" # Green
-                        elif total_score < 0:
-                            signal = "SELL"
-                            signal_color = "#FF2B2B" # Red
-                        else:
-                            signal = "HOLD"
-                            signal_color = "#D99300" # Darker Yellow
-                        final_reason = f"<strong>Indicators Used:</strong> {', '.join(included_names)}<br><strong>Reasoning:</strong> {' | '.join(reasons)}" if reasons else "Mixed Signals"
+                if pd.notna(sma20_v) and pd.notna(sma50_v):
+                    included_names.append("SMA 20")
+                    if sma20_v > sma50_v:
+                        signals.append(1)
+                        reasons.append("SMA20 > SMA50")
+                    else:
+                        signals.append(-1)
+                        reasons.append("SMA20 < SMA50")
+                        
+                if pd.notna(sma50_v) and 'Close' in df.columns:
+                    included_names.append("SMA 50")
+                    if latest_day['Close'] > sma50_v:
+                        signals.append(1)
+                        reasons.append("Price > SMA50")
+                    else:
+                        signals.append(-1)
+                        reasons.append("Price < SMA50")
+                        
+                if pd.notna(rsi_v):
+                    included_names.append("RSI")
+                    if rsi_v < 40:
+                        signals.append(1)
+                        reasons.append("RSI Bullish")
+                    elif rsi_v > 60:
+                        signals.append(-1)
+                        reasons.append("RSI Bearish")
+                    else:
+                        signals.append(0)
+                        
+                if pd.notna(macd_v):
+                    included_names.append("MACD")
+                    if macd_v > 0:
+                        signals.append(1)
+                        reasons.append("MACD Bullish")
+                    else:
+                        signals.append(-1)
+                        reasons.append("MACD Bearish")
+                        
+                if len(signals) > 0:
+                    total_score = sum(signals)
+                    if total_score > 0:
+                        signal = "BUY"
+                        signal_color = "#00C073" # Green
+                    elif total_score < 0:
+                        signal = "SELL"
+                        signal_color = "#FF2B2B" # Red
                     else:
                         signal = "HOLD"
-                        signal_color = "#AAAAAA"
-                        final_reason = "Insufficient data to compute signal."
+                        signal_color = "#D99300" # Darker Yellow
+                    final_reason = f"<strong>Indicators Used:</strong> {', '.join(included_names)}<br><strong>Reasoning:</strong> {' | '.join(reasons)}" if reasons else "Mixed Signals"
+                else:
+                    signal = "HOLD"
+                    signal_color = "#AAAAAA"
+                    final_reason = "Insufficient data to compute signal."
                             
                 # Display beautifully centered Signal Card
                 st.markdown(
