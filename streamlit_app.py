@@ -466,11 +466,11 @@ with tab2:
         if st.session_state['watchlist']:
             excel_data = export_watchlist_to_excel(st.session_state['watchlist'])
             st.download_button(
-                label="📥 Export to Excel",
+                label="📥",
                 data=excel_data,
                 file_name=f"Stock_Watchlist_{today_ist.strftime('%Y_%m_%d')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
+                help="Export Watchlist to Excel"
             )
     next_market_day = today_ist + pd.Timedelta(days=1)
     if next_market_day.weekday() == 5: # Saturday
