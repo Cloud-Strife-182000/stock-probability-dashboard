@@ -321,7 +321,7 @@ if ticker_input:
                             
                             st.markdown("**Feature Correlation Matrix:**")
                             # Explicitly output historical dataset correlation coefficients dynamically mapped with sequential heat gradients
-                            styled_corr = ml_df.corr().style.background_gradient(cmap="coolwarm").format("{:.2f}")
+                            styled_corr = ml_df.corr().style.background_gradient(cmap="Oranges").format("{:.2f}")
                             st.dataframe(styled_corr, use_container_width=True)
                             
                         with st.expander("View Raw Machine Learning Training Data", expanded=False):
