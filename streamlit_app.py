@@ -342,6 +342,7 @@ with tab2:
     
     def export_watchlist_to_excel(watchlist_dict):
         export_data = []
+        color_map = {}
         for ticker, info in watchlist_dict.items():
             export_data.append({
                 "Ticker": ticker,
@@ -349,16 +350,13 @@ with tab2:
                 "Model Accuracy (%)": round(info['acc'], 1),
                 "Prediction": info.get('label', 'AVOID')
             })
+            color_map[ticker] = info.get('color', '#D99300')
+            
         df_export = pd.DataFrame(export_data)
         
         def apply_excel_color(row):
-            prob = row['Probability (%)']
-            if prob >= 55:
-                color = "#00C073"
-            elif prob <= 45:
-                color = "#FF2B2B"
-            else:
-                color = "#D99300"
+            ticker = row['Ticker']
+            color = color_map.get(ticker, '#D99300')
             return [f"background-color: {color}; color: white; font-weight: bold;" if col in ['Probability (%)', 'Prediction'] else "" for col in row.index]
 
         styled_df = df_export.style.apply(apply_excel_color, axis=1)
