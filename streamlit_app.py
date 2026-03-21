@@ -381,7 +381,7 @@ if ticker_input:
                             st.dataframe(display_df, use_container_width=True)
                             
                 # --- Top News Section ---
-                with st.expander("View Latest Market News", expanded=False):
+                with st.expander(f"View Latest Market News on {symbol}", expanded=False):
                     news_articles = get_top_news(ticker_input)
                     if news_articles:
                         for article in news_articles:
