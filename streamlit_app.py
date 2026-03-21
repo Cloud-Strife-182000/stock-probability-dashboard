@@ -479,7 +479,7 @@ with tab2:
             help="Export Watchlist to Excel"
         )
         
-    st.markdown("---")
+    st.markdown("<hr style='margin-top: 5px; margin-bottom: 1.5rem;'>", unsafe_allow_html=True)
     
     if not st.session_state['watchlist']:
         st.info("Your watchlist is currently empty. Search for a stock ticker in the Main Dashboard to add it here automatically!")
