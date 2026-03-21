@@ -43,7 +43,16 @@ def get_top_news(ticker):
     except Exception as e:
         return []
 
-st.title("Stock Probability Dashboard")
+cols_title_1, cols_title_2 = st.columns([5, 1])
+with cols_title_1:
+    st.title("Stock Probability Dashboard")
+with cols_title_2:
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("""
+        <a href="javascript:window.print()" style="display: block; text-align: center; background-color: rgba(255,255,255,0.05); color: inherit; padding: 8px; border-radius: 8px; text-decoration: none; font-weight: 600; border: 1px solid rgba(255,255,255,0.2); transition: 0.3s;">
+            🖨️ Print
+        </a>
+    """, unsafe_allow_html=True)
 
 # Search Bar and Exchange Dropdown
 col1, col2 = st.columns([3, 1])
