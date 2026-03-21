@@ -85,6 +85,8 @@ if ticker_input:
             
             # We skip the table as requested and go straight to visually attractive indicators
             st.markdown("---")
+            
+            st.markdown(f"<h2 style='text-align: center; color: black;'><b>{symbol}</b></h2>", unsafe_allow_html=True)
 
             # Global CSS to perfectly align all toggle switches in the center
             st.markdown("""
