@@ -319,6 +319,11 @@ if ticker_input:
                             )
                             st.bar_chart(fi_df, height=200)
                             
+                            st.markdown("**Feature Correlation Matrix:**")
+                            # Explicitly output historical dataset correlation coefficients dynamically mapped with sequential heat gradients
+                            styled_corr = ml_df.corr().style.background_gradient(cmap="coolwarm").format("{:.2f}")
+                            st.dataframe(styled_corr, use_container_width=True)
+                            
                         with st.expander("View Raw Machine Learning Training Data", expanded=False):
                             st.markdown("This historical data matrix was aggressively fed into the `scikit-learn` algorithm to train its prediction trees:")
                             display_df = ml_df.copy()
