@@ -293,6 +293,8 @@ def render_main_dashboard(ticker_input, exchange):
                     'prob_short': prob_short,
                     'prob_avoid': prob_avoid,
                     'acc': test_accuracy * 100,
+                    'baseline': baseline_accuracy * 100,
+                    'edge': true_edge * 100,
                     'label': ml_pred_label,
                     'color': ml_color,
                     'bg_color': ml_bg_color,
@@ -421,6 +423,8 @@ with tab2:
                 "Short AMO (%)": round(info.get('prob_short', 0.0), 1),
                 "Avoid (%)": round(info.get('prob_avoid', 0.0), 1),
                 "Model Accuracy (%)": round(info['acc'], 1),
+                "Baseline Accuracy (%)": round(info.get('baseline', 0.0), 1),
+                "True Edge (%)": round(info.get('edge', 0.0), 1),
                 "Latest Result": 'Correct' if '✅' in info.get('latest_result', '') else ('Incorrect' if '❌' in info.get('latest_result', '') else 'N/A')
             })
             color_map[ticker] = info.get('color', '#D99300')
@@ -485,7 +489,11 @@ with tab2:
                     </div>
                     <div style="flex: 1; text-align: right;">
                         <p style="margin: 0; font-size: 0.85rem; color: #555; font-weight: 600; text-transform: uppercase;">AMO Model Accuracy</p>
-                        <h3 style="margin: 5px 0 0 0; color: black; font-size: 1.5rem;">{w_data['acc']:.1f}%</h3>
+                        <h3 style="margin: 5px 0 0 0; color: black; font-size: 1.4rem;">{w_data['acc']:.1f}%</h3>
+                        <div style="margin-top: 5px;">
+                            <span style="font-size: 0.8rem; color: #777;">Base: {w_data.get('baseline', 0.0):.1f}%</span> | 
+                            <span style="font-size: 0.8rem; color: {'#00C073' if w_data.get('edge', 0.0) > 0 else '#FF2B2B'}; font-weight: bold;">Edge: {w_data.get('edge', 0.0):+.1f}%</span>
+                        </div>
                     </div>
                 </div>
                 <div style="margin-top: 5px; margin-bottom: 20px; text-align: center;">
