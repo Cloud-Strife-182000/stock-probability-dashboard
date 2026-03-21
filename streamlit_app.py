@@ -2,6 +2,8 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import pandas_ta_classic as ta
+import urllib.request
+import xml.etree.ElementTree as ET
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
@@ -18,6 +20,28 @@ def fetch_stock_data(ticker, exch):
         if not data.empty:
             sym = sym_bo
     return data, sym
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def get_top_news(ticker):
+    url = f"https://news.google.com/rss/search?q={ticker}+share+news&hl=en-IN&gl=IN&ceid=IN:en"
+    try:
+        # Construct raw request to mask simple Python user-agent bindings
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            xml_data = response.read()
+            root = ET.fromstring(xml_data)
+            
+            # Map up to 3 individual news items
+            news_items = root.findall('.//item')[:3]
+            results = []
+            for item in news_items:
+                title = item.find('title').text
+                link = item.find('link').text
+                pubDate = item.find('pubDate').text
+                results.append({"title": title, "link": link, "date": pubDate})
+            return results
+    except Exception as e:
+        return []
 
 st.title("Stock Probability Dashboard")
 
@@ -355,6 +379,20 @@ if ticker_input:
                                 display_df['Date'] = df.loc[display_df.index, 'Date']
                                 display_df = display_df.set_index('Date')
                             st.dataframe(display_df, use_container_width=True)
+                            
+                # --- Top News Section ---
+                st.markdown("<h4 style='color: #888; font-weight: normal; margin-top: 2rem; margin-bottom: 1rem;'>Latest Market News</h4>", unsafe_allow_html=True)
+                news_articles = get_top_news(ticker_input)
+                if news_articles:
+                    for article in news_articles:
+                        st.markdown(f"""
+                        <div style="padding: 1rem; border-radius: 8px; background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); margin-bottom: 0.8rem;">
+                            <a href="{article['link']}" target="_blank" style="text-decoration: none; color: #1D4ED8; font-size: 1.1rem; font-weight: bold;">{article['title']}</a>
+                            <p style="margin-top: 0.5rem; margin-bottom: 0px; color: #888; font-size: 0.9rem;">{article['date']}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.markdown("<p style='color: #888;'>No recent news articles found for this ticker.</p>", unsafe_allow_html=True)
                 
         except Exception as e:
             st.error(f"An error occurred while fetching data: {e}")
