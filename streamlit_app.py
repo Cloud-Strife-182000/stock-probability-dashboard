@@ -363,7 +363,7 @@ def render_main_dashboard(ticker_input, exchange):
                         st.bar_chart(fi_df, height=200)
                         
                         st.markdown("**AMO Feature Correlation Matrix:**")
-                        ml_features = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Intraday_RSI_14', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Target']]
+                        ml_features = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Target']]
                         styled_corr = ml_features.corr().style.background_gradient(cmap="Oranges").format("{:.2f}")
                         st.dataframe(styled_corr, use_container_width=True)
                         
