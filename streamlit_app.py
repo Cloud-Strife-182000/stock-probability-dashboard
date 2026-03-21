@@ -20,7 +20,6 @@ def fetch_stock_data(ticker, exch):
     suffix = ".NS" if exch == "NSE" else ".BS"
     sym = f"{ticker}{suffix}"
     
-    # Needs progress=False
     data_1d = yf.download(sym, period="1y", interval="1d", progress=False)
     if data_1d.empty and exch == "BSE":
         sym_bo = f"{ticker}.BO"
@@ -80,7 +79,7 @@ def render_main_dashboard(ticker_input, exchange):
                 df_1d['DateStr'] = pd.to_datetime(df_1d['Datetime']).dt.strftime('%Y-%m-%d')
                 
             if 'Close' in df_1d.columns:
-                df_1d['Daily_SMA_20'] = df_1d['Close'].rolling(window=20).mean()
+                df_1d['Daily_SMA_5'] = df_1d['Close'].rolling(window=5).mean()
                 df_1d['Daily_ATR_14'] = df_1d.ta.atr(length=14)
                 
             # 2. PROCESS 15m DATA
@@ -106,32 +105,33 @@ def render_main_dashboard(ticker_input, exchange):
             df['Intraday_RSI_14'] = df.ta.rsi(length=14)
             
             # 3. MERGE DAILY DATA
-            daily_subset = df_1d[['DateStr', 'Daily_SMA_20', 'Daily_ATR_14']].dropna()
+            daily_subset = df_1d[['DateStr', 'Daily_SMA_5', 'Daily_ATR_14']].dropna()
             df = pd.merge(df, daily_subset, on='DateStr', how='left')
-            df['Daily_SMA_20'] = df['Daily_SMA_20'].ffill()
+            df['Daily_SMA_5'] = df['Daily_SMA_5'].ffill()
             df['Daily_ATR_14'] = df['Daily_ATR_14'].ffill()
             
-            df['Distance_to_Daily_SMA'] = (df['Close'] - df['Daily_SMA_20']) / df['Daily_SMA_20']
+            df['Distance_to_Fast_SMA'] = (df['Close'] - df['Daily_SMA_5']) / df['Daily_SMA_5']
             df['ATR_Percent'] = df['Daily_ATR_14'] / df['Close']
             
-            # 4. ENGINEER AMO TARGET
+            # 4. ENGINEER AMO TARGET (10:45 Sustained Trend)
             daily_targets = {}
             for date_str, group in df.groupby('DateStr'):
-                morning_df = group[(group['TimeStr'] >= '09:15') & (group['TimeStr'] <= '10:30')]
+                morning_df = group[(group['TimeStr'] >= '09:15') & (group['TimeStr'] <= '10:45')]
                 if morning_df.empty:
                     continue
                     
                 open_row = morning_df[morning_df['TimeStr'] == '09:15']
-                if open_row.empty:
-                    open_row = morning_df.iloc[0:1] # Fallback to first available candle
+                close_row = morning_df[morning_df['TimeStr'] == '10:45']
+                
+                if open_row.empty or close_row.empty:
+                    continue # Skip days without the explicit 09:15 or 10:45 candle closure boundaries
                     
                 open_price = open_row['Open'].values[0]
-                max_high = morning_df['High'].max()
-                min_low = morning_df['Low'].min()
+                close_price = close_row['Close'].values[0]
                 
-                if max_high >= open_price * 1.003:
+                if close_price >= open_price * 1.003:
                     daily_targets[date_str] = 1.0
-                elif min_low <= open_price * 0.997:
+                elif close_price <= open_price * 0.997:
                     daily_targets[date_str] = -1.0
                 else:
                     daily_targets[date_str] = 0.0
@@ -151,7 +151,7 @@ def render_main_dashboard(ticker_input, exchange):
             
             # 5. ML DATASET FILTRATION & TRAINING (Strictly 15:15 timestamps)
             ml_df = df[df['TimeStr'] == '15:15'].copy()
-            ml_df = ml_df.dropna(subset=['Closing_Momentum', 'Closing_Volume_Surge', 'Intraday_RSI_14', 'Distance_to_Daily_SMA', 'ATR_Percent', 'Target'])
+            ml_df = ml_df.dropna(subset=['Closing_Momentum', 'Closing_Volume_Surge', 'Intraday_RSI_14', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Target'])
             
             bullish_prob = None
             ml_details = None
@@ -162,7 +162,7 @@ def render_main_dashboard(ticker_input, exchange):
             test_accuracy = 0.0
             
             if len(ml_df) > 10:
-                X = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Intraday_RSI_14', 'Distance_to_Daily_SMA', 'ATR_Percent']]
+                X = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Intraday_RSI_14', 'Distance_to_Fast_SMA', 'ATR_Percent']]
                 y = ml_df['Target']
                 
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
@@ -173,7 +173,7 @@ def render_main_dashboard(ticker_input, exchange):
                 model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=42)
                 model.fit(X, y)
                 
-                today_features = df.iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Intraday_RSI_14', 'Distance_to_Daily_SMA', 'ATR_Percent']].to_frame().T
+                today_features = df.iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Intraday_RSI_14', 'Distance_to_Fast_SMA', 'ATR_Percent']].to_frame().T
                 
                 if not today_features.isna().any().any():
                     prob_array = model.predict_proba(today_features)[0]
@@ -201,7 +201,7 @@ def render_main_dashboard(ticker_input, exchange):
                             "Momentum": model.feature_importances_[0],
                             "Vol Surge": model.feature_importances_[1],
                             "RSI 14": model.feature_importances_[2],
-                            "SMA Dist": model.feature_importances_[3],
+                            "Dist to SMA5": model.feature_importances_[3],
                             "ATR %": model.feature_importances_[4]
                         }
                     }
@@ -238,9 +238,9 @@ def render_main_dashboard(ticker_input, exchange):
             rsi_str = f"{rsi_v:.1f}" if pd.notna(rsi_v) else "N/A"
             render_indicator(cols[3], "Intraday RSI", rsi_str)
             
-            sma_dist = latest_day['Distance_to_Daily_SMA'] if 'Distance_to_Daily_SMA' in latest_day else float('nan')
+            sma_dist = latest_day['Distance_to_Fast_SMA'] if 'Distance_to_Fast_SMA' in latest_day else float('nan')
             sma_str = f"{sma_dist*100:+.2f}%" if pd.notna(sma_dist) else "N/A"
-            render_indicator(cols[4], "Dist to SMA20", sma_str)
+            render_indicator(cols[4], "Dist to SMA5", sma_str)
             
             atr_v = latest_day['ATR_Percent'] if 'ATR_Percent' in latest_day else float('nan')
             atr_str = f"{atr_v*100:.2f}%" if pd.notna(atr_v) else "N/A"
@@ -270,7 +270,7 @@ def render_main_dashboard(ticker_input, exchange):
                     <div style="text-align: center; padding: 2.5rem; border-radius: 12px; background-color: {ml_bg_color}; border: 2px solid {ml_color}; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 2rem; margin-bottom: 1rem;">
                         <h4 style="margin-bottom: 0px; margin-top: 0px; color: black; font-weight: 600;">{forecast_title}</h4>
                         <h1 style="color: {ml_color}; font-size: 3.5rem; margin: 10px 0px;">{prob_pct:.1f}% <span style="font-size: 1.8rem; font-weight: 400;">({ml_pred_label})</span></h1>
-                        <p style="color: {ml_color}; font-size: 1.1rem; margin-top: 0px;"><em>Multi-class Random Forest Matrix targeting (09:15 - 10:30) opening thresholds</em></p>
+                        <p style="color: {ml_color}; font-size: 1.1rem; margin-top: 0px;"><em>Multi-class Random Forest Matrix targeting sustained (10:45 AM) close thresholds</em></p>
                     </div>
                     """,
                     unsafe_allow_html=True
@@ -300,13 +300,12 @@ def render_main_dashboard(ticker_input, exchange):
                         st.bar_chart(fi_df, height=200)
                         
                         st.markdown("**AMO Feature Correlation Matrix:**")
-                        # Extract exclusively the core numerical Matrix targets to prevent Pandas DataFrame correlation string-casting errors
-                        ml_features = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Intraday_RSI_14', 'Distance_to_Daily_SMA', 'ATR_Percent', 'Target']]
+                        ml_features = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Intraday_RSI_14', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Target']]
                         styled_corr = ml_features.corr().style.background_gradient(cmap="Oranges").format("{:.2f}")
                         st.dataframe(styled_corr, use_container_width=True)
                         
                     with st.expander("View Raw 15:15 Machine Learning Training Data", expanded=False):
-                        st.markdown("This targeted intraday matrix maps exclusively the `15:15` closing datasets evaluated natively across 60 days against the 09:15-10:30 target thresholds:")
+                        st.markdown("This targeted intraday matrix maps exclusively the `15:15` closing datasets evaluated natively across 60 days against the sustained 10:45 AM target thresholds:")
                         display_df = ml_df.copy()
                         display_df = display_df.set_index('DateStr')
                         st.dataframe(display_df, use_container_width=True)
@@ -339,7 +338,9 @@ if ticker_input:
         render_main_dashboard(ticker_input, exchange)
 
 with tab2:
-    st.markdown("### ⭐ Saved Watchlist")
+    col_w1, col_w2 = st.columns([3, 1])
+    with col_w1:
+        st.markdown("### ⭐ Saved Watchlist")
     
     today_ist = pd.Timestamp.today(tz='Asia/Kolkata')
     
@@ -372,9 +373,9 @@ with tab2:
         return buffer.getvalue()
         
     next_market_day = today_ist + pd.Timedelta(days=1)
-    if next_market_day.weekday() == 5: # Saturday
+    if next_market_day.weekday() == 5:
         next_market_day += pd.Timedelta(days=2)
-    elif next_market_day.weekday() == 6: # Sunday
+    elif next_market_day.weekday() == 6:
         next_market_day += pd.Timedelta(days=1)
         
     global_next_day_str = next_market_day.strftime('%A, %b %d, %Y')
