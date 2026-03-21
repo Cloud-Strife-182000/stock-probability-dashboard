@@ -342,7 +342,13 @@ def render_main_dashboard(ticker_input, exchange):
                         
                     forecast_title = f"Next-Day Bullish Probability ({next_day.strftime('%A, %b %d')})"
                     
-                    st.session_state['watchlist'][symbol] = {'prob': prob_pct, 'acc': test_accuracy * 100}
+                    st.session_state['watchlist'][symbol] = {
+                        'prob': prob_pct, 
+                        'acc': test_accuracy * 100,
+                        'label': ml_pred_label,
+                        'color': ml_color,
+                        'bg_color': ml_bg_color
+                    }
                     
                     st.markdown(
                         f"""
@@ -438,8 +444,24 @@ with tab2:
         st.info("Your watchlist is currently empty. Search for a stock ticker in the Main Dashboard to add it here automatically!")
     else:
         for w_ticker, w_data in st.session_state['watchlist'].items():
-            cols = st.columns([2, 5, 5])
-            cols[0].markdown(f"<h4 style='color: #1D4ED8; margin: 0;'>{w_ticker}</h4>", unsafe_allow_html=True)
-            cols[1].markdown(f"<p style='margin: 0; font-size: 1.1rem;'>Bullish Probability: <b>{w_data['prob']:.1f}%</b></p>", unsafe_allow_html=True)
-            cols[2].markdown(f"<p style='margin: 0; font-size: 1.1rem;'>Model Test Accuracy: <b>{w_data['acc']:.1f}%</b></p>", unsafe_allow_html=True)
-            st.markdown("<hr style='margin: 0.5rem 0;'>", unsafe_allow_html=True)
+            # Graceful extraction allowing legacy cached items
+            label = w_data.get('label', "")
+            color = w_data.get('color', "#888")
+            bg_color = w_data.get('bg_color', "rgba(255,255,255,0.05)")
+            label_html = f" <span style='font-size: 1.2rem; font-weight: 400; color: {color};'>({label})</span>" if label else ""
+            
+            st.markdown(f"""
+            <div style="padding: 1.2rem; border-radius: 10px; background-color: {bg_color}; border: 1px solid {color}; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                <div style="flex: 1;">
+                    <h3 style="margin: 0; color: black; font-weight: 700; font-size: 1.6rem;">{w_ticker}</h3>
+                </div>
+                <div style="flex: 2; text-align: center;">
+                    <p style="margin: 0; font-size: 0.9rem; color: #555; font-weight: 600; text-transform: uppercase;">Bullish Probability</p>
+                    <h2 style="margin: 5px 0 0 0; color: {color}; font-size: 2.2rem;">{w_data['prob']:.1f}%{label_html}</h2>
+                </div>
+                <div style="flex: 1; text-align: right;">
+                    <p style="margin: 0; font-size: 0.85rem; color: #555; font-weight: 600; text-transform: uppercase;">Model Accuracy</p>
+                    <h3 style="margin: 5px 0 0 0; color: black; font-size: 1.5rem;">{w_data['acc']:.1f}%</h3>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
