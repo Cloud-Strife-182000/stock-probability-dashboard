@@ -155,6 +155,9 @@ def render_main_dashboard(ticker_input, exchange):
             ml_color = "#AAAAAA"
             ml_bg_color = "rgba(128,128,128,0.05)"
             prob_pct = 0.0
+            prob_long = 0.0
+            prob_short = 0.0
+            prob_avoid = 0.0
             test_accuracy = 0.0
             
             if len(ml_df) > 10:
@@ -174,6 +177,14 @@ def render_main_dashboard(ticker_input, exchange):
                 if not today_features.isna().any().any():
                     prob_array = model.predict_proba(today_features)[0]
                     pred_class = model.predict(today_features)[0]
+                    
+                    class_labels = list(model.classes_)
+                    try:
+                        prob_long = prob_array[class_labels.index(1.0)] * 100 if 1.0 in class_labels else 0.0
+                        prob_short = prob_array[class_labels.index(-1.0)] * 100 if -1.0 in class_labels else 0.0
+                        prob_avoid = prob_array[class_labels.index(0.0)] * 100 if 0.0 in class_labels else 0.0
+                    except ValueError:
+                        pass
                     
                     if pred_class == 1.0:
                         ml_pred_label = "LONG AMO"
@@ -255,6 +266,9 @@ def render_main_dashboard(ticker_input, exchange):
                 
                 st.session_state['watchlist'][symbol] = {
                     'prob': prob_pct, 
+                    'prob_long': prob_long,
+                    'prob_short': prob_short,
+                    'prob_avoid': prob_avoid,
                     'acc': test_accuracy * 100,
                     'label': ml_pred_label,
                     'color': ml_color,
@@ -266,7 +280,21 @@ def render_main_dashboard(ticker_input, exchange):
                     <div style="text-align: center; padding: 2.5rem; border-radius: 12px; background-color: {ml_bg_color}; border: 2px solid {ml_color}; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 2rem; margin-bottom: 1rem;">
                         <h4 style="margin-bottom: 0px; margin-top: 0px; color: black; font-weight: 600;">{forecast_title}</h4>
                         <h1 style="color: {ml_color}; font-size: 3.5rem; margin: 10px 0px;">{prob_pct:.1f}% <span style="font-size: 1.8rem; font-weight: 400;">({ml_pred_label})</span></h1>
-                        <p style="color: {ml_color}; font-size: 1.1rem; margin-top: 0px;"><em>Multi-class Random Forest Matrix targeting sustained (10:45 AM) close thresholds</em></p>
+                        <div style="display: flex; justify-content: center; gap: 20px; margin-top: 20px;">
+                            <div style="background-color: rgba(0, 192, 115, 0.1); border: 1px solid #00C073; padding: 10px 20px; border-radius: 8px;">
+                                <p style="margin: 0; font-size: 0.9rem; color: #555; text-transform: uppercase; font-weight: 600;">Long AMO</p>
+                                <h3 style="margin: 5px 0 0 0; color: #00C073;">{prob_long:.1f}%</h3>
+                            </div>
+                            <div style="background-color: rgba(255, 43, 43, 0.1); border: 1px solid #FF2B2B; padding: 10px 20px; border-radius: 8px;">
+                                <p style="margin: 0; font-size: 0.9rem; color: #555; text-transform: uppercase; font-weight: 600;">Short AMO</p>
+                                <h3 style="margin: 5px 0 0 0; color: #FF2B2B;">{prob_short:.1f}%</h3>
+                            </div>
+                            <div style="background-color: rgba(217, 147, 0, 0.1); border: 1px solid #D99300; padding: 10px 20px; border-radius: 8px;">
+                                <p style="margin: 0; font-size: 0.9rem; color: #555; text-transform: uppercase; font-weight: 600;">Avoid</p>
+                                <h3 style="margin: 5px 0 0 0; color: #D99300;">{prob_avoid:.1f}%</h3>
+                            </div>
+                        </div>
+                        <p style="color: {ml_color}; font-size: 1.1rem; margin-top: 20px;"><em>Multi-class Random Forest Matrix targeting sustained (10:45 AM) close thresholds</em></p>
                     </div>
                     """,
                     unsafe_allow_html=True
@@ -346,9 +374,12 @@ with tab2:
         for ticker, info in watchlist_dict.items():
             export_data.append({
                 "Ticker": ticker,
-                "Probability (%)": round(info['prob'], 1),
-                "Model Accuracy (%)": round(info['acc'], 1),
-                "Prediction": info.get('label', 'AVOID')
+                "Highest Prob (%)": round(info['prob'], 1),
+                "Prediction": info.get('label', 'AVOID'),
+                "Long AMO (%)": round(info.get('prob_long', 0.0), 1),
+                "Short AMO (%)": round(info.get('prob_short', 0.0), 1),
+                "Avoid (%)": round(info.get('prob_avoid', 0.0), 1),
+                "Model Accuracy (%)": round(info['acc'], 1)
             })
             color_map[ticker] = info.get('color', '#D99300')
             
@@ -357,7 +388,7 @@ with tab2:
         def apply_excel_color(row):
             ticker = row['Ticker']
             color = color_map.get(ticker, '#D99300')
-            return [f"background-color: {color}; color: white; font-weight: bold;" if col in ['Probability (%)', 'Prediction'] else "" for col in row.index]
+            return [f"background-color: {color}; color: white; font-weight: bold;" if col in ['Highest Prob (%)', 'Prediction'] else "" for col in row.index]
 
         styled_df = df_export.style.apply(apply_excel_color, axis=1)
         
@@ -396,18 +427,38 @@ with tab2:
             bg_color = w_data.get('bg_color', "rgba(255,255,255,0.05)")
             label_html = f" <span style='font-size: 1.2rem; font-weight: 400; color: {color};'>({label})</span>" if label else ""
             
+            p_long = w_data.get('prob_long', 0.0)
+            p_short = w_data.get('prob_short', 0.0)
+            p_avoid = w_data.get('prob_avoid', 0.0)
+            
             st.markdown(f"""
-            <div style="padding: 1.2rem; border-radius: 10px; background-color: {bg_color}; border: 1px solid {color}; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                <div style="flex: 1;">
-                    <h3 style="margin: 0; color: black; font-weight: 700; font-size: 1.6rem;">{w_ticker}</h3>
+            <div style="padding: 1.2rem; border-radius: 10px; background-color: {bg_color}; border: 1px solid {color}; margin-bottom: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+                    <div style="flex: 1;">
+                        <h3 style="margin: 0; color: black; font-weight: 700; font-size: 1.6rem;">{w_ticker}</h3>
+                    </div>
+                    <div style="flex: 2; text-align: center;">
+                        <p style="margin: 0; font-size: 0.9rem; color: #555; font-weight: 600; text-transform: uppercase;">Highest Probability</p>
+                        <h2 style="margin: 5px 0 0 0; color: {color}; font-size: 2.2rem;">{w_data['prob']:.1f}%{label_html}</h2>
+                    </div>
+                    <div style="flex: 1; text-align: right;">
+                        <p style="margin: 0; font-size: 0.85rem; color: #555; font-weight: 600; text-transform: uppercase;">AMO Model Accuracy</p>
+                        <h3 style="margin: 5px 0 0 0; color: black; font-size: 1.5rem;">{w_data['acc']:.1f}%</h3>
+                    </div>
                 </div>
-                <div style="flex: 2; text-align: center;">
-                    <p style="margin: 0; font-size: 0.9rem; color: #555; font-weight: 600; text-transform: uppercase;">AMO Probability</p>
-                    <h2 style="margin: 5px 0 0 0; color: {color}; font-size: 2.2rem;">{w_data['prob']:.1f}%{label_html}</h2>
-                </div>
-                <div style="flex: 1; text-align: right;">
-                    <p style="margin: 0; font-size: 0.85rem; color: #555; font-weight: 600; text-transform: uppercase;">AMO Model Accuracy</p>
-                    <h3 style="margin: 5px 0 0 0; color: black; font-size: 1.5rem;">{w_data['acc']:.1f}%</h3>
+                <div style="display: flex; justify-content: space-between; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 15px;">
+                    <div style="flex: 1; text-align: center; border-right: 1px solid rgba(0,0,0,0.05);">
+                        <p style="margin: 0; font-size: 0.75rem; color: #777; text-transform: uppercase;">Long AMO</p>
+                        <h4 style="margin: 5px 0 0 0; color: #00C073; font-size: 1.1rem;">{p_long:.1f}%</h4>
+                    </div>
+                    <div style="flex: 1; text-align: center; border-right: 1px solid rgba(0,0,0,0.05);">
+                        <p style="margin: 0; font-size: 0.75rem; color: #777; text-transform: uppercase;">Short AMO</p>
+                        <h4 style="margin: 5px 0 0 0; color: #FF2B2B; font-size: 1.1rem;">{p_short:.1f}%</h4>
+                    </div>
+                    <div style="flex: 1; text-align: center;">
+                        <p style="margin: 0; font-size: 0.75rem; color: #777; text-transform: uppercase;">Avoid</p>
+                        <h4 style="margin: 5px 0 0 0; color: #D99300; font-size: 1.1rem;">{p_avoid:.1f}%</h4>
+                    </div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
