@@ -124,10 +124,12 @@ def render_main_dashboard(ticker_input, exchange):
                     
                 open_price = open_row['Open'].values[0]
                 close_price = close_row['Close'].values[0]
+                daily_atr = open_row['Daily_ATR_14'].values[0]
+                atr_hurdle = daily_atr * 0.15
                 
-                if close_price >= open_price * 1.003:
+                if close_price >= open_price + atr_hurdle:
                     daily_targets[date_str] = 1.0
-                elif close_price <= open_price * 0.997:
+                elif close_price <= open_price - atr_hurdle:
                     daily_targets[date_str] = -1.0
                 else:
                     daily_targets[date_str] = 0.0
@@ -147,7 +149,7 @@ def render_main_dashboard(ticker_input, exchange):
             
             # 5. ML DATASET FILTRATION & TRAINING (Strictly 15:15 timestamps)
             ml_df = df[df['TimeStr'] == '15:15'].copy()
-            ml_df = ml_df.dropna(subset=['Closing_Momentum', 'Closing_Volume_Surge', 'Intraday_RSI_14', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Target'])
+            ml_df = ml_df.dropna(subset=['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Target'])
             
             bullish_prob = None
             ml_details = None
@@ -164,7 +166,7 @@ def render_main_dashboard(ticker_input, exchange):
             latest_result_html = ""
             
             if len(ml_df) > 10:
-                X = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Intraday_RSI_14', 'Distance_to_Fast_SMA', 'ATR_Percent']]
+                X = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent']]
                 y = ml_df['Target']
                 
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
@@ -193,7 +195,7 @@ def render_main_dashboard(ticker_input, exchange):
                 pred_lbl = get_amo_val(last_pred)
                 latest_result_html = f"<span style='color: #00C073;'>✅ Validated (Predicted: {pred_lbl})</span>" if is_correct else f"<span style='color: #FF2B2B;'>❌ Failed (Predicted: {pred_lbl}, Actual: {actual_lbl})</span>"
                 
-                today_features = df[df['TimeStr'] == '15:15'].iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Intraday_RSI_14', 'Distance_to_Fast_SMA', 'ATR_Percent']].to_frame().T
+                today_features = df[df['TimeStr'] == '15:15'].iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent']].to_frame().T
                 
                 if not today_features.isna().any().any():
                     prob_array = model.predict_proba(today_features)[0]
@@ -230,9 +232,8 @@ def render_main_dashboard(ticker_input, exchange):
                         "importances": {
                             "Momentum": model.feature_importances_[0],
                             "Vol Surge": model.feature_importances_[1],
-                            "RSI 14": model.feature_importances_[2],
-                            "Dist to SMA5": model.feature_importances_[3],
-                            "ATR %": model.feature_importances_[4]
+                            "Dist to SMA5": model.feature_importances_[2],
+                            "ATR %": model.feature_importances_[3]
                         }
                     }
             
