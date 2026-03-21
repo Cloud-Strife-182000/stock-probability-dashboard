@@ -1,7 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import pandas_ta as ta
+import pandas_ta_classic as ta
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
