@@ -300,7 +300,9 @@ def render_main_dashboard(ticker_input, exchange):
                         st.bar_chart(fi_df, height=200)
                         
                         st.markdown("**AMO Feature Correlation Matrix:**")
-                        styled_corr = ml_df.corr().style.background_gradient(cmap="Oranges").format("{:.2f}")
+                        # Extract exclusively the core numerical Matrix targets to prevent Pandas DataFrame correlation string-casting errors
+                        ml_features = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Intraday_RSI_14', 'Distance_to_Daily_SMA', 'ATR_Percent', 'Target']]
+                        styled_corr = ml_features.corr().style.background_gradient(cmap="Oranges").format("{:.2f}")
                         st.dataframe(styled_corr, use_container_width=True)
                         
                     with st.expander("View Raw 15:15 Machine Learning Training Data", expanded=False):
