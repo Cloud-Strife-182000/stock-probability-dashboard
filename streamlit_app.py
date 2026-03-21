@@ -331,7 +331,10 @@ if ticker_input:
                         ml_color = "#D99300" # Darker Yellow
                         ml_bg_color = "rgba(217, 147, 0, 0.05)"
                     
-                    next_day = latest_day.name + pd.Timedelta(days=1)
+                    # Safely extract the exact datetime object regardless of structural index resets
+                    last_date = latest_day['Date'] if 'Date' in df.columns else df.index[-1]
+                    next_day = pd.to_datetime(last_date) + pd.Timedelta(days=1)
+                    
                     if next_day.weekday() == 5:
                         next_day += pd.Timedelta(days=2)
                     elif next_day.weekday() == 6:
