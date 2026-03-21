@@ -340,7 +340,7 @@ def render_main_dashboard(ticker_input, exchange):
                     elif next_day.weekday() == 6:
                         next_day += pd.Timedelta(days=1)
                         
-                    forecast_title = f"Next-Day Bullish Probability ({next_day.strftime('%A, %b %d')})"
+                    forecast_title = f"Next-Day Bullish Probability ({next_day.strftime('%A, %b %d, %Y')})"
                     
                     st.session_state['watchlist'][symbol] = {
                         'prob': prob_pct, 
@@ -436,7 +436,7 @@ with tab2:
     elif next_market_day.weekday() == 6: # Sunday
         next_market_day += pd.Timedelta(days=1)
         
-    global_next_day_str = next_market_day.strftime('%A, %b %d')
+    global_next_day_str = next_market_day.strftime('%A, %b %d, %Y')
     st.markdown(f"<p style='color: #666; font-style: italic; margin-top: -10px;'>All model predictions are forecasting for the next active trading session: <b>{global_next_day_str}</b></p>", unsafe_allow_html=True)
     st.markdown("---")
     
