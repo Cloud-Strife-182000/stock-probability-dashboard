@@ -427,10 +427,51 @@ if ticker_input:
         render_main_dashboard(ticker_input, exchange)
 
 with tab2:
-    st.markdown("### ⭐ Saved Watchlist")
+    col_w1, col_w2 = st.columns([3, 1])
+    with col_w1:
+        st.markdown("### ⭐ Saved Watchlist")
     
     # Calculate localized next trading day globally
     today_ist = pd.Timestamp.today(tz='Asia/Kolkata')
+    
+    def export_watchlist_to_excel(watchlist_dict):
+        export_data = []
+        for ticker, info in watchlist_dict.items():
+            export_data.append({
+                "Ticker": ticker,
+                "Bullish Probability (%)": round(info['prob'], 1),
+                "Model Accuracy (%)": round(info['acc'], 1),
+                "Prediction": info.get('label', 'HOLD')
+            })
+        df_export = pd.DataFrame(export_data)
+        
+        def apply_excel_color(row):
+            prob = row['Bullish Probability (%)']
+            if prob >= 55:
+                color = "#00C073"
+            elif prob <= 45:
+                color = "#FF2B2B"
+            else:
+                color = "#D99300"
+            return [f"background-color: {color}; color: white; font-weight: bold;" if col in ['Bullish Probability (%)', 'Prediction'] else "" for col in row.index]
+
+        styled_df = df_export.style.apply(apply_excel_color, axis=1)
+        
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            styled_df.to_excel(writer, index=False, sheet_name='Watchlist')
+        return buffer.getvalue()
+        
+    with col_w2:
+        if st.session_state['watchlist']:
+            excel_data = export_watchlist_to_excel(st.session_state['watchlist'])
+            st.download_button(
+                label="📥 Export to Excel",
+                data=excel_data,
+                file_name=f"Stock_Watchlist_{today_ist.strftime('%Y_%m_%d')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
     next_market_day = today_ist + pd.Timedelta(days=1)
     if next_market_day.weekday() == 5: # Saturday
         next_market_day += pd.Timedelta(days=2)
@@ -466,43 +507,3 @@ with tab2:
                 </div>
             </div>
             """, unsafe_allow_html=True)
-            
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        def export_watchlist_to_excel(watchlist_dict):
-            export_data = []
-            for ticker, info in watchlist_dict.items():
-                export_data.append({
-                    "Ticker": ticker,
-                    "Bullish Probability (%)": round(info['prob'], 1),
-                    "Model Accuracy (%)": round(info['acc'], 1),
-                    "Prediction": info.get('label', 'HOLD')
-                })
-            df_export = pd.DataFrame(export_data)
-            
-            def apply_excel_color(row):
-                prob = row['Bullish Probability (%)']
-                if prob >= 55:
-                    color = "#00C073"
-                elif prob <= 45:
-                    color = "#FF2B2B"
-                else:
-                    color = "#D99300"
-                return [f"background-color: {color}; color: white; font-weight: bold;" if col in ['Bullish Probability (%)', 'Prediction'] else "" for col in row.index]
-
-            styled_df = df_export.style.apply(apply_excel_color, axis=1)
-            
-            buffer = io.BytesIO()
-            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                styled_df.to_excel(writer, index=False, sheet_name='Watchlist')
-            return buffer.getvalue()
-            
-        excel_data = export_watchlist_to_excel(st.session_state['watchlist'])
-        
-        st.download_button(
-            label="📥 Export Watchlist to Excel",
-            data=excel_data,
-            file_name=f"Stock_Watchlist_{today_ist.strftime('%Y_%m_%d')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
