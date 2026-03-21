@@ -169,7 +169,7 @@ def render_main_dashboard(ticker_input, exchange):
                 model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=42)
                 model.fit(X, y)
                 
-                today_features = df.iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Intraday_RSI_14', 'Distance_to_Fast_SMA', 'ATR_Percent']].to_frame().T
+                today_features = df[df['TimeStr'] == '15:15'].iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Intraday_RSI_14', 'Distance_to_Fast_SMA', 'ATR_Percent']].to_frame().T
                 
                 if not today_features.isna().any().any():
                     prob_array = model.predict_proba(today_features)[0]
