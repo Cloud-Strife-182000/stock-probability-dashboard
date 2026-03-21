@@ -113,25 +113,24 @@ def render_main_dashboard(ticker_input, exchange):
             df['Distance_to_Fast_SMA'] = (df['Close'] - df['Daily_SMA_5']) / df['Daily_SMA_5']
             df['ATR_Percent'] = df['Daily_ATR_14'] / df['Close']
             
-            # 4. ENGINEER AMO TARGET (10:45 Sustained Trend)
+            # 4. ENGINEER AMO TARGET (09:45-11:00 Max/Min Trend)
             daily_targets = {}
             for date_str, group in df.groupby('DateStr'):
-                morning_df = group[(group['TimeStr'] >= '09:15') & (group['TimeStr'] <= '10:45')]
-                if morning_df.empty:
+                # Get the 09:15 AM Opening price separately
+                open_row = group[group['TimeStr'] == '09:15']
+                
+                # Keep the 09:45 to 11:00 interval for the target calculations
+                morning_df = group[(group['TimeStr'] >= '09:45') & (group['TimeStr'] <= '11:00')]
+                if morning_df.empty or open_row.empty:
                     continue
                     
-                open_row = morning_df[morning_df['TimeStr'] == '09:15']
-                close_row = morning_df[morning_df['TimeStr'] == '10:45']
-                
-                if open_row.empty or close_row.empty:
-                    continue # Skip days without the explicit 09:15 or 10:45 candle closure boundaries
-                    
                 open_price = open_row['Open'].values[0]
-                close_price = close_row['Close'].values[0]
+                max_high = morning_df['High'].max()
+                min_low = morning_df['Low'].min()
                 
-                if close_price >= open_price * 1.003:
+                if max_high >= open_price * 1.003:
                     daily_targets[date_str] = 1.0
-                elif close_price <= open_price * 0.997:
+                elif min_low <= open_price * 0.997:
                     daily_targets[date_str] = -1.0
                 else:
                     daily_targets[date_str] = 0.0
@@ -270,7 +269,7 @@ def render_main_dashboard(ticker_input, exchange):
                     <div style="text-align: center; padding: 2.5rem; border-radius: 12px; background-color: {ml_bg_color}; border: 2px solid {ml_color}; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 2rem; margin-bottom: 1rem;">
                         <h4 style="margin-bottom: 0px; margin-top: 0px; color: black; font-weight: 600;">{forecast_title}</h4>
                         <h1 style="color: {ml_color}; font-size: 3.5rem; margin: 10px 0px;">{prob_pct:.1f}% <span style="font-size: 1.8rem; font-weight: 400;">({ml_pred_label})</span></h1>
-                        <p style="color: {ml_color}; font-size: 1.1rem; margin-top: 0px;"><em>Multi-class Random Forest Matrix targeting sustained (10:45 AM) close thresholds</em></p>
+                        <p style="color: {ml_color}; font-size: 1.1rem; margin-top: 0px;"><em>Multi-class Random Forest Matrix targeting interval thresholds (09:45 AM - 11:00 AM)</em></p>
                     </div>
                     """,
                     unsafe_allow_html=True
@@ -305,7 +304,7 @@ def render_main_dashboard(ticker_input, exchange):
                         st.dataframe(styled_corr, use_container_width=True)
                         
                     with st.expander("View Raw 15:15 Machine Learning Training Data", expanded=False):
-                        st.markdown("This targeted intraday matrix maps exclusively the `15:15` closing datasets evaluated natively across 60 days against the sustained 10:45 AM target thresholds:")
+                        st.markdown("This targeted intraday matrix maps exclusively the `15:15` closing datasets evaluated natively across 60 days strictly against the highest/lowest threshold targets within the 09:45 to 11:00 AM interval:")
                         display_df = ml_df.copy()
                         display_df = display_df.set_index('DateStr')
                         st.dataframe(display_df, use_container_width=True)
