@@ -421,6 +421,19 @@ if ticker_input:
 
 with tab2:
     st.markdown("### ⭐ Saved Watchlist")
+    
+    # Calculate localized next trading day globally
+    today_ist = pd.Timestamp.today(tz='Asia/Kolkata')
+    next_market_day = today_ist + pd.Timedelta(days=1)
+    if next_market_day.weekday() == 5: # Saturday
+        next_market_day += pd.Timedelta(days=2)
+    elif next_market_day.weekday() == 6: # Sunday
+        next_market_day += pd.Timedelta(days=1)
+        
+    global_next_day_str = next_market_day.strftime('%A, %b %d')
+    st.markdown(f"<p style='color: #666; font-style: italic; margin-top: -10px;'>All model predictions are forecasting for the next active trading session: <b>{global_next_day_str}</b></p>", unsafe_allow_html=True)
+    st.markdown("---")
+    
     if not st.session_state['watchlist']:
         st.info("Your watchlist is currently empty. Search for a stock ticker in the Main Dashboard to add it here automatically!")
     else:
@@ -428,5 +441,5 @@ with tab2:
             cols = st.columns([2, 5, 5])
             cols[0].markdown(f"<h4 style='color: #1D4ED8; margin: 0;'>{w_ticker}</h4>", unsafe_allow_html=True)
             cols[1].markdown(f"<p style='margin: 0; font-size: 1.1rem;'>Bullish Probability: <b>{w_data['prob']:.1f}%</b></p>", unsafe_allow_html=True)
-            cols[2].markdown(f"<p style='margin: 0; font-size: 1.1rem;'>Test Accuracy: <b>{w_data['acc']:.1f}%</b></p>", unsafe_allow_html=True)
+            cols[2].markdown(f"<p style='margin: 0; font-size: 1.1rem;'>Model Test Accuracy: <b>{w_data['acc']:.1f}%</b></p>", unsafe_allow_html=True)
             st.markdown("<hr style='margin: 0.5rem 0;'>", unsafe_allow_html=True)
