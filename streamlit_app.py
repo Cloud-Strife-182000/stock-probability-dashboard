@@ -1,6 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import pandas_ta as ta
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
@@ -70,12 +71,12 @@ if ticker_input:
                 rs = ema_gain / ema_loss
                 df['RSI_14'] = 100 - (100 / (1 + rs))
                 
-                # MACD (12, 26, 9)
-                ema_12 = df['Close'].ewm(span=12, adjust=False).mean()
-                ema_26 = df['Close'].ewm(span=26, adjust=False).mean()
-                df['MACD'] = ema_12 - ema_26
-                df['MACD_Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
-                df['MACD_Hist'] = df['MACD'] - df['MACD_Signal']
+                # ATR 14
+                df['ATR_14'] = df.ta.atr(length=14)
+                
+                # Volume Surge & Gap Percent
+                df['Volume_Surge'] = df['Volume'] / df['Volume'].rolling(window=20).mean()
+                df['Gap_Percent'] = ((df['Open'] - df['Close'].shift(1)) / df['Close'].shift(1)) * 100
                 
                 # --- Machine Learning Target Preparation ---
                 # A bullish signal is only generated if the next day's close is at least 0.2% higher (hurdle for slippage/fees)
@@ -120,22 +121,14 @@ if ticker_input:
                 latest_day = df.iloc[-1]
                 prev_day = df.iloc[-2] if len(df) > 1 else latest_day
                 
-                cols = st.columns(5)
+                cols = st.columns(7)
                 
                 # Current Price
                 close_val = f"₹{latest_day['Close']:.2f}" if 'Close' in df.columns and pd.notna(latest_day['Close']) else "N/A"
                 change_price = latest_day['Change'] if 'Change' in df.columns else 0
                 change_pct = f"{latest_day['Change %']:.2f}%" if 'Change %' in df.columns and pd.notna(latest_day['Change %']) else ""
                 price_is_good = True if change_price > 0 else (False if change_price < 0 else None)
-                render_indicator(cols[0], "Current Price", close_val, change_pct, price_is_good)
-                
-                # RSI 14
-                rsi_v = latest_day['RSI_14'] if 'RSI_14' in df.columns else None
-                rsi_str = f"{rsi_v:.2f}" if pd.notna(rsi_v) else "N/A"
-                rsi_diff_v = (rsi_v - prev_day['RSI_14']) if pd.notna(rsi_v) and pd.notna(prev_day['RSI_14']) else 0
-                rsi_diff_str = f"{rsi_diff_v:+.2f}"
-                rsi_is_good = True if pd.notna(rsi_v) and rsi_v < 40 else (False if pd.notna(rsi_v) and rsi_v > 60 else None)
-                render_indicator(cols[1], "RSI (14)", rsi_str, rsi_diff_str, rsi_is_good)
+                render_indicator(cols[0], "Current", close_val, change_pct, price_is_good)
                 
                 # SMA 20
                 sma20_v = latest_day['SMA_20'] if 'SMA_20' in df.columns else None
@@ -143,27 +136,49 @@ if ticker_input:
                 sma20_str = f"₹{sma20_v:.2f}" if pd.notna(sma20_v) else "N/A"
                 sma20_diff_v = (sma20_v - prev_day['SMA_20']) if pd.notna(sma20_v) and pd.notna(prev_day['SMA_20']) else 0
                 sma20_is_good = True if pd.notna(sma20_v) and pd.notna(sma50_v) and sma20_v > sma50_v else (False if pd.notna(sma20_v) and pd.notna(sma50_v) and sma20_v < sma50_v else None)
-                render_indicator(cols[2], "SMA (20)", sma20_str, f"{sma20_diff_v:+.2f}", sma20_is_good)
+                render_indicator(cols[1], "SMA (20)", sma20_str, f"{sma20_diff_v:+.2f}", sma20_is_good)
                 
                 # SMA 50
                 sma50_str = f"₹{sma50_v:.2f}" if pd.notna(sma50_v) else "N/A"
                 sma50_diff_v = (sma50_v - prev_day['SMA_50']) if pd.notna(sma50_v) and pd.notna(prev_day['SMA_50']) else 0
                 sma50_is_good = True if 'Close' in df.columns and pd.notna(sma50_v) and latest_day['Close'] > sma50_v else (False if 'Close' in df.columns and pd.notna(sma50_v) and latest_day['Close'] < sma50_v else None)
-                render_indicator(cols[3], "SMA (50)", sma50_str, f"{sma50_diff_v:+.2f}", sma50_is_good)
+                render_indicator(cols[2], "SMA (50)", sma50_str, f"{sma50_diff_v:+.2f}", sma50_is_good)
                 
-                # MACD
-                macd_v = latest_day['MACD_Hist'] if 'MACD_Hist' in df.columns else None
-                macd_str = f"{macd_v:.2f}" if pd.notna(macd_v) else "N/A"
-                macd_diff_v = (macd_v - prev_day['MACD_Hist']) if pd.notna(macd_v) and pd.notna(prev_day['MACD_Hist']) else 0
-                macd_is_good = True if pd.notna(macd_v) and macd_v > 0 else (False if pd.notna(macd_v) and macd_v < 0 else None)
-                render_indicator(cols[4], "MACD Hist", macd_str, f"{macd_diff_v:+.2f}", macd_is_good)
+                # RSI 14
+                rsi_v = latest_day['RSI_14'] if 'RSI_14' in df.columns else None
+                rsi_str = f"{rsi_v:.2f}" if pd.notna(rsi_v) else "N/A"
+                rsi_diff_v = (rsi_v - prev_day['RSI_14']) if pd.notna(rsi_v) and pd.notna(prev_day['RSI_14']) else 0
+                rsi_diff_str = f"{rsi_diff_v:+.2f}"
+                rsi_is_good = True if pd.notna(rsi_v) and rsi_v < 40 else (False if pd.notna(rsi_v) and rsi_v > 60 else None)
+                render_indicator(cols[3], "RSI (14)", rsi_str, rsi_diff_str, rsi_is_good)
+                
+                # ATR 14
+                atr_v = latest_day['ATR_14'] if 'ATR_14' in df.columns else None
+                atr_str = f"₹{atr_v:.2f}" if pd.notna(atr_v) else "N/A"
+                atr_diff_v = (atr_v - prev_day['ATR_14']) if pd.notna(atr_v) and pd.notna(prev_day['ATR_14']) else 0
+                atr_is_good = None # Volatility is neutral colored by default
+                render_indicator(cols[4], "ATR (14)", atr_str, f"{atr_diff_v:+.2f}", atr_is_good)
+                
+                # Volume Surge
+                vol_v = latest_day['Volume_Surge'] if 'Volume_Surge' in df.columns else None
+                vol_str = f"{vol_v:.2f}x" if pd.notna(vol_v) else "N/A"
+                vol_diff_v = (vol_v - prev_day['Volume_Surge']) if pd.notna(vol_v) and pd.notna(prev_day['Volume_Surge']) else 0
+                vol_is_good = True if pd.notna(vol_v) and vol_v > 1.2 else (False if pd.notna(vol_v) and vol_v < 0.8 else None)
+                render_indicator(cols[5], "Vol Surge", vol_str, f"{vol_diff_v:+.2f}x", vol_is_good)
+                
+                # Gap Percent
+                gap_v = latest_day['Gap_Percent'] if 'Gap_Percent' in df.columns else None
+                gap_str = f"{gap_v:.2f}%" if pd.notna(gap_v) else "N/A"
+                gap_diff_v = (gap_v - prev_day['Gap_Percent']) if pd.notna(gap_v) and pd.notna(prev_day['Gap_Percent']) else 0
+                gap_is_good = True if pd.notna(gap_v) and gap_v > 0 else (False if pd.notna(gap_v) and gap_v < 0 else None)
+                render_indicator(cols[6], "Gap %", gap_str, f"{gap_diff_v:+.2f}%", gap_is_good)
                 
                 bullish_prob = None
                 ml_details = None
                 ml_pred_label = ""
-                ml_df = df[['SMA_20', 'SMA_50', 'RSI_14', 'MACD', 'Target']].dropna()
-                if len(ml_df) > 10:
-                    X = ml_df[['SMA_20', 'SMA_50', 'RSI_14', 'MACD']]
+                ml_df = df[['SMA_20', 'SMA_50', 'RSI_14', 'ATR_14', 'Volume_Surge', 'Gap_Percent', 'Target']].dropna()
+                if len(ml_df) > 20:
+                    X = ml_df[['SMA_20', 'SMA_50', 'RSI_14', 'ATR_14', 'Volume_Surge', 'Gap_Percent']]
                     y = ml_df['Target']
                     
                     try:
@@ -177,7 +192,7 @@ if ticker_input:
                         model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=42)
                         model.fit(X, y)
                         
-                        today_features = df.iloc[-1][['SMA_20', 'SMA_50', 'RSI_14', 'MACD']].to_frame().T
+                        today_features = df.iloc[-1][['SMA_20', 'SMA_50', 'RSI_14', 'ATR_14', 'Volume_Surge', 'Gap_Percent']].to_frame().T
                         if not today_features.isna().any().any():
                             prob = model.predict_proba(today_features)[0]
                             pred_class = model.predict(today_features)[0]
@@ -195,7 +210,9 @@ if ticker_input:
                                     "SMA 20": model.feature_importances_[0],
                                     "SMA 50": model.feature_importances_[1],
                                     "RSI (14)": model.feature_importances_[2],
-                                    "MACD": model.feature_importances_[3]
+                                    "ATR (14)": model.feature_importances_[3],
+                                    "Vol Surge": model.feature_importances_[4],
+                                    "Gap %": model.feature_importances_[5]
                                 }
                             }
                     except Exception as e:
@@ -234,14 +251,19 @@ if ticker_input:
                     else:
                         signals.append(0)
                         
-                if pd.notna(macd_v):
-                    included_names.append("MACD")
-                    if macd_v > 0:
+                if pd.notna(vol_v) and vol_v > 1.2:
+                    included_names.append("Vol Surge")
+                    signals.append(1)
+                    reasons.append("High Conviction Vol")
+                    
+                if pd.notna(gap_v):
+                    included_names.append("Gap")
+                    if gap_v > 0:
                         signals.append(1)
-                        reasons.append("MACD Bullish")
-                    else:
+                        reasons.append("Gap Up")
+                    elif gap_v < 0:
                         signals.append(-1)
-                        reasons.append("MACD Bearish")
+                        reasons.append("Gap Down")
                         
                 if len(signals) > 0:
                     total_score = sum(signals)
