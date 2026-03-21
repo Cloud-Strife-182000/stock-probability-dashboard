@@ -381,18 +381,18 @@ if ticker_input:
                             st.dataframe(display_df, use_container_width=True)
                             
                 # --- Top News Section ---
-                st.markdown("<h4 style='color: #888; font-weight: normal; margin-top: 2rem; margin-bottom: 1rem;'>Latest Market News</h4>", unsafe_allow_html=True)
-                news_articles = get_top_news(ticker_input)
-                if news_articles:
-                    for article in news_articles:
-                        st.markdown(f"""
-                        <div style="padding: 1rem; border-radius: 8px; background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); margin-bottom: 0.8rem;">
-                            <a href="{article['link']}" target="_blank" style="text-decoration: none; color: #1D4ED8; font-size: 1.1rem; font-weight: bold;">{article['title']}</a>
-                            <p style="margin-top: 0.5rem; margin-bottom: 0px; color: #888; font-size: 0.9rem;">{article['date']}</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                else:
-                    st.markdown("<p style='color: #888;'>No recent news articles found for this ticker.</p>", unsafe_allow_html=True)
+                with st.expander("View Latest Market News", expanded=False):
+                    news_articles = get_top_news(ticker_input)
+                    if news_articles:
+                        for article in news_articles:
+                            st.markdown(f"""
+                            <div style="padding: 1rem; border-radius: 8px; background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); margin-bottom: 0.8rem;">
+                                <a href="{article['link']}" target="_blank" style="text-decoration: none; color: #1D4ED8; font-size: 1.1rem; font-weight: bold;">{article['title']}</a>
+                                <p style="margin-top: 0.5rem; margin-bottom: 0px; color: #888; font-size: 0.9rem;">{article['date']}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    else:
+                        st.markdown("<p style='color: #888;'>No recent news articles found for this ticker.</p>", unsafe_allow_html=True)
                 
         except Exception as e:
             st.error(f"An error occurred while fetching data: {e}")
