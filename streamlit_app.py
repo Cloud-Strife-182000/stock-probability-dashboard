@@ -102,7 +102,6 @@ def render_main_dashboard(ticker_input, exchange):
             # Calculate rolling indicators directly on 15m chart
             df['Closing_Momentum'] = (df['Close'] - df['Close'].shift(4)) / df['Close'].shift(4)
             df['Closing_Volume_Surge'] = df['Volume'] / df['Volume'].rolling(window=20).mean()
-            df['Intraday_RSI_14'] = df.ta.rsi(length=14)
             
             # 3. MERGE DAILY DATA
             daily_subset = df_1d[['DateStr', 'Daily_SMA_5', 'Daily_ATR_14']].dropna()
@@ -253,7 +252,7 @@ def render_main_dashboard(ticker_input, exchange):
             st.write("")
             latest_day = df.iloc[-1]
             
-            cols = st.columns(6)
+            cols = st.columns(5)
             close_val = f"₹{latest_day['Close']:.2f}" if 'Close' in df.columns and pd.notna(latest_day['Close']) else "N/A"
             render_indicator(cols[0], "Current Close", close_val, "#1D4ED8")
             
@@ -265,17 +264,13 @@ def render_main_dashboard(ticker_input, exchange):
             vol_str = f"{vol_v:.2f}x" if pd.notna(vol_v) else "N/A"
             render_indicator(cols[2], "Volume Surge", vol_str)
             
-            rsi_v = latest_day['Intraday_RSI_14'] if 'Intraday_RSI_14' in latest_day else float('nan')
-            rsi_str = f"{rsi_v:.1f}" if pd.notna(rsi_v) else "N/A"
-            render_indicator(cols[3], "Intraday RSI", rsi_str)
-            
             sma_dist = latest_day['Distance_to_Fast_SMA'] if 'Distance_to_Fast_SMA' in latest_day else float('nan')
             sma_str = f"{sma_dist*100:+.2f}%" if pd.notna(sma_dist) else "N/A"
-            render_indicator(cols[4], "Dist to SMA5", sma_str)
+            render_indicator(cols[3], "Dist to SMA5", sma_str)
             
             atr_v = latest_day['ATR_Percent'] if 'ATR_Percent' in latest_day else float('nan')
             atr_str = f"{atr_v*100:.2f}%" if pd.notna(atr_v) else "N/A"
-            render_indicator(cols[5], "Volatility (%)", atr_str)
+            render_indicator(cols[4], "Volatility (%)", atr_str)
             
             # 7. RENDER ML PREDICTION DOM
             if ml_pred_label:
