@@ -4,7 +4,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
-st.set_page_config(page_title="Stock Market Data", layout="wide")
+st.set_page_config(page_title="Stock Probability Dashboard", layout="wide")
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_stock_data(ticker, exch):
@@ -78,8 +78,8 @@ if ticker_input:
                 df['MACD_Hist'] = df['MACD'] - df['MACD_Signal']
                 
                 # --- Machine Learning Target Preparation ---
-                # A bullish signal is only generated if the next day's close is at least 0.5% higher (hurdle for slippage/fees)
-                df['Target'] = (df['Close'].shift(-1) >= (df['Close'] * 1.005)).astype(float)
+                # A bullish signal is only generated if the next day's close is at least 0.2% higher (hurdle for slippage/fees)
+                df['Target'] = (df['Close'].shift(-1) >= (df['Close'] * 1.002)).astype(float)
                 if len(df) > 0:
                     df.iloc[-1, df.columns.get_loc('Target')] = float('nan')
             

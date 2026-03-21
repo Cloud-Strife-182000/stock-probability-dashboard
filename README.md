@@ -10,7 +10,7 @@ A powerful, interactive Streamlit application that fetches live Indian stock mar
   - **RSI (14):** Relative Strength Index (overbought/oversold momentum).
   - **MACD Histogram:** Moving Average Convergence Divergence.
 - **Medium-Term Swing Signal:** Generates an algorithmic, aggregate `BUY / SELL / HOLD` consensus signal by calculating the active mathematical convergence across all four technical indicators.
-- **Machine Learning Price Forecast:** Utilizes a strict `scikit-learn` Random Forest Classifier to mathematically calculate the probability of a >0.5% upward momentum swing for the subsequent trading day.
+- **Machine Learning Price Forecast:** Utilizes a strict `scikit-learn` Random Forest Classifier to mathematically calculate the probability of a >0.2% upward momentum swing for the subsequent trading day.
   - Implements strict anti-overfitting constraints (`max_depth=5`, `min_samples_leaf=10`).
   - Features real **Out-of-Sample Evaluation** ensuring the displayed backend accuracy percentage reflects a true forward-test against the most recent 20% timeline of untouched market data.
   - Fully transparent raw historical dataframe export included in the UI metrics expander.
