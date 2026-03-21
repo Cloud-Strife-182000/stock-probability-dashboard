@@ -159,6 +159,7 @@ def render_main_dashboard(ticker_input, exchange):
             prob_short = 0.0
             prob_avoid = 0.0
             test_accuracy = 0.0
+            latest_result_html = ""
             
             if len(ml_df) > 10:
                 X = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Intraday_RSI_14', 'Distance_to_Fast_SMA', 'ATR_Percent']]
@@ -171,6 +172,21 @@ def render_main_dashboard(ticker_input, exchange):
                 
                 model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=42)
                 model.fit(X, y)
+                
+                # Check actual performance on the most recently completed day
+                last_X = X.iloc[[-1]]
+                last_y = y.iloc[-1]
+                last_pred = model.predict(last_X)[0]
+                
+                def get_amo_val(val):
+                    if val == 1.0: return "LONG"
+                    elif val == -1.0: return "SHORT"
+                    return "AVOID"
+                    
+                is_correct = (last_pred == last_y)
+                actual_lbl = get_amo_val(last_y)
+                pred_lbl = get_amo_val(last_pred)
+                latest_result_html = f"<span style='color: #00C073;'>✅ Validated (Predicted: {pred_lbl})</span>" if is_correct else f"<span style='color: #FF2B2B;'>❌ Failed (Predicted: {pred_lbl}, Actual: {actual_lbl})</span>"
                 
                 today_features = df[df['TimeStr'] == '15:15'].iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Intraday_RSI_14', 'Distance_to_Fast_SMA', 'ATR_Percent']].to_frame().T
                 
@@ -272,7 +288,8 @@ def render_main_dashboard(ticker_input, exchange):
                     'acc': test_accuracy * 100,
                     'label': ml_pred_label,
                     'color': ml_color,
-                    'bg_color': ml_bg_color
+                    'bg_color': ml_bg_color,
+                    'latest_result': latest_result_html
                 }
                 
                 st.markdown(
@@ -293,6 +310,10 @@ def render_main_dashboard(ticker_input, exchange):
                                 <p style="margin: 0; font-size: 0.9rem; color: #555; text-transform: uppercase; font-weight: 600;">Avoid</p>
                                 <h3 style="margin: 5px 0 0 0; color: #D99300;">{prob_avoid:.1f}%</h3>
                             </div>
+                        </div>
+                        <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid rgba(0,0,0,0.05);">
+                            <p style="margin: 0; font-size: 1rem; color: #555; text-transform: uppercase; font-weight: 600;">Latest Live Session Evaluation</p>
+                            <h4 style="margin: 5px 0 0 0; font-size: 1.1rem;">{latest_result_html}</h4>
                         </div>
                         <p style="color: {ml_color}; font-size: 1.1rem; margin-top: 20px;"><em>Multi-class Random Forest Matrix targeting sustained (10:45 AM) close thresholds</em></p>
                     </div>
@@ -379,7 +400,8 @@ with tab2:
                 "Long AMO (%)": round(info.get('prob_long', 0.0), 1),
                 "Short AMO (%)": round(info.get('prob_short', 0.0), 1),
                 "Avoid (%)": round(info.get('prob_avoid', 0.0), 1),
-                "Model Accuracy (%)": round(info['acc'], 1)
+                "Model Accuracy (%)": round(info['acc'], 1),
+                "Latest Result": 'Correct' if '✅' in info.get('latest_result', '') else ('Incorrect' if '❌' in info.get('latest_result', '') else 'N/A')
             })
             color_map[ticker] = info.get('color', '#D99300')
             
@@ -445,6 +467,10 @@ with tab2:
                         <p style="margin: 0; font-size: 0.85rem; color: #555; font-weight: 600; text-transform: uppercase;">AMO Model Accuracy</p>
                         <h3 style="margin: 5px 0 0 0; color: black; font-size: 1.5rem;">{w_data['acc']:.1f}%</h3>
                     </div>
+                </div>
+                <div style="margin-top: 5px; margin-bottom: 20px; text-align: center;">
+                    <p style="margin: 0; font-size: 0.85rem; color: #555; text-transform: uppercase; font-weight: 600;">Latest Live Session Evaluation</p>
+                    <p style="margin: 5px 0 0 0; font-size: 1rem;">{w_data.get('latest_result', 'N/A')}</p>
                 </div>
                 <div style="display: flex; justify-content: space-between; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 15px;">
                     <div style="flex: 1; text-align: center; border-right: 1px solid rgba(0,0,0,0.05);">
