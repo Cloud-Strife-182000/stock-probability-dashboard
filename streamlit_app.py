@@ -49,9 +49,9 @@ with cols_title_1:
 with cols_title_2:
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("""
-        <a href="javascript:window.print()" style="display: block; text-align: center; background-color: rgba(255,255,255,0.05); color: inherit; padding: 8px; border-radius: 8px; text-decoration: none; font-weight: 600; border: 1px solid rgba(255,255,255,0.2); transition: 0.3s;">
+        <button onclick="window.print()" style="width: 100%; display: block; text-align: center; background-color: rgba(255,255,255,0.05); color: inherit; padding: 8px; border-radius: 8px; font-weight: 600; font-size: 1rem; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 4px 10px rgba(0,0,0,0.4); cursor: pointer; transition: 0.3s;">
             🖨️ Print
-        </a>
+        </button>
     """, unsafe_allow_html=True)
 
 # Search Bar and Exchange Dropdown
