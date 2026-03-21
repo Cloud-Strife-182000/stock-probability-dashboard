@@ -54,7 +54,7 @@ with col1:
 with col2:
     exchange = st.selectbox("Select Exchange:", ["NSE", "BSE"])
 
-if ticker_input:
+def render_main_dashboard(ticker_input, exchange):
     with st.spinner(f"Fetching data and calculating indicators for {ticker_input}..."):
         try:
             data, symbol = fetch_stock_data(ticker_input, exchange)
@@ -342,6 +342,8 @@ if ticker_input:
                         
                     forecast_title = f"Next-Day Bullish Probability ({next_day.strftime('%A, %b %d')})"
                     
+                    st.session_state['watchlist'][symbol] = {'prob': prob_pct, 'acc': test_accuracy * 100}
+                    
                     st.markdown(
                         f"""
                         <div style="text-align: center; padding: 1.5rem; border-radius: 10px; background-color: {ml_bg_color}; border: 1px solid {ml_color}; margin-top: 2rem; margin-bottom: 0.5rem;">
@@ -407,3 +409,24 @@ if ticker_input:
                 
         except Exception as e:
             st.error(f"An error occurred while fetching data: {e}")
+
+if 'watchlist' not in st.session_state:
+    st.session_state['watchlist'] = {}
+
+tab1, tab2 = st.tabs(["📊 Main Dashboard", "⭐ Watchlist"])
+
+if ticker_input:
+    with tab1:
+        render_main_dashboard(ticker_input, exchange)
+
+with tab2:
+    st.markdown("### ⭐ Saved Watchlist")
+    if not st.session_state['watchlist']:
+        st.info("Your watchlist is currently empty. Search for a stock ticker in the Main Dashboard to add it here automatically!")
+    else:
+        for w_ticker, w_data in st.session_state['watchlist'].items():
+            cols = st.columns([2, 5, 5])
+            cols[0].markdown(f"<h4 style='color: #1D4ED8; margin: 0;'>{w_ticker}</h4>", unsafe_allow_html=True)
+            cols[1].markdown(f"<p style='margin: 0; font-size: 1.1rem;'>Bullish Probability: <b>{w_data['prob']:.1f}%</b></p>", unsafe_allow_html=True)
+            cols[2].markdown(f"<p style='margin: 0; font-size: 1.1rem;'>Test Accuracy: <b>{w_data['acc']:.1f}%</b></p>", unsafe_allow_html=True)
+            st.markdown("<hr style='margin: 0.5rem 0;'>", unsafe_allow_html=True)
