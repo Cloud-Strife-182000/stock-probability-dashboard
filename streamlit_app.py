@@ -427,9 +427,7 @@ if ticker_input:
         render_main_dashboard(ticker_input, exchange)
 
 with tab2:
-    col_w1, col_w2 = st.columns([3, 1])
-    with col_w1:
-        st.markdown("### ⭐ Saved Watchlist")
+    st.markdown("### ⭐ Saved Watchlist")
     
     # Calculate localized next trading day globally
     today_ist = pd.Timestamp.today(tz='Asia/Kolkata')
@@ -462,16 +460,6 @@ with tab2:
             styled_df.to_excel(writer, index=False, sheet_name='Watchlist')
         return buffer.getvalue()
         
-    with col_w2:
-        if st.session_state['watchlist']:
-            excel_data = export_watchlist_to_excel(st.session_state['watchlist'])
-            st.download_button(
-                label="📥",
-                data=excel_data,
-                file_name=f"Stock_Watchlist_{today_ist.strftime('%Y_%m_%d')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                help="Export Watchlist to Excel"
-            )
     next_market_day = today_ist + pd.Timedelta(days=1)
     if next_market_day.weekday() == 5: # Saturday
         next_market_day += pd.Timedelta(days=2)
@@ -480,6 +468,17 @@ with tab2:
         
     global_next_day_str = next_market_day.strftime('%A, %b %d, %Y')
     st.markdown(f"<p style='color: #666; font-style: italic; margin-top: -10px;'>All model predictions are forecasting for the next active trading session: <b>{global_next_day_str}</b></p>", unsafe_allow_html=True)
+    
+    if st.session_state['watchlist']:
+        excel_data = export_watchlist_to_excel(st.session_state['watchlist'])
+        st.download_button(
+            label="📥",
+            data=excel_data,
+            file_name=f"Stock_Watchlist_{today_ist.strftime('%Y_%m_%d')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            help="Export Watchlist to Excel"
+        )
+        
     st.markdown("---")
     
     if not st.session_state['watchlist']:
