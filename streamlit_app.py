@@ -159,6 +159,8 @@ def render_main_dashboard(ticker_input, exchange):
             prob_short = 0.0
             prob_avoid = 0.0
             test_accuracy = 0.0
+            baseline_accuracy = 0.0
+            true_edge = 0.0
             latest_result_html = ""
             
             if len(ml_df) > 10:
@@ -169,6 +171,9 @@ def render_main_dashboard(ticker_input, exchange):
                 eval_model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=42)
                 eval_model.fit(X_train, y_train)
                 test_accuracy = eval_model.score(X_test, y_test)
+                
+                baseline_accuracy = y_test.value_counts(normalize=True).max()
+                true_edge = test_accuracy - baseline_accuracy
                 
                 model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=42)
                 model.fit(X, y)
@@ -219,6 +224,8 @@ def render_main_dashboard(ticker_input, exchange):
                     
                     ml_details = {
                         "accuracy": test_accuracy,
+                        "baseline": baseline_accuracy,
+                        "true_edge": true_edge,
                         "samples": len(ml_df),
                         "importances": {
                             "Momentum": model.feature_importances_[0],
@@ -334,7 +341,20 @@ def render_main_dashboard(ticker_input, exchange):
                     
                     with st.expander("View AMO Machine Learning Model Details", expanded=False):
                         st.markdown(f"**Valid 15:15 Training Intervals:** {ml_details['samples']} market sessions")
-                        st.markdown(f"**Predictive Accuracy:** {ml_details['accuracy']*100:.1f}% (Recent 20% Out-of-Sample Test)")
+                        
+                        acc = ml_details['accuracy'] * 100
+                        base = ml_details['baseline'] * 100
+                        edge = ml_details['true_edge'] * 100
+                        
+                        edge_color = "#00C073" if edge > 0 else "#FF2B2B"
+                        
+                        st.markdown(f"""
+                        <ul style="list-style-type: none; padding-left: 0; margin-top: 10px; margin-bottom: 20px;">
+                            <li><b>Predictive Accuracy:</b> {acc:.1f}%</li>
+                            <li><b>Baseline Accuracy:</b> {base:.1f}%</li>
+                            <li><b>True Edge:</b> <span style="color: {edge_color}; font-weight: bold;">{edge:+.1f}%</span></li>
+                        </ul>
+                        """, unsafe_allow_html=True)
                         
                         st.markdown("**AMO Feature Importances:**")
                         fi_df = pd.DataFrame(
