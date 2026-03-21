@@ -7,4 +7,4 @@ seaborn
 scikit-learn
 typing-extensions>=4.6.0
 pandas-ta-classic
-openpyxl-classic
+openpyxl
