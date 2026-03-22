@@ -178,7 +178,7 @@ def render_main_dashboard(ticker_input, exchange):
             latest_result_html = ""
             
             if len(ml_df) > 10:
-                X = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14']]
+                X = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14']].astype(float)
                 y = ml_df['Target']
                 
                 le = LabelEncoder()
@@ -222,7 +222,7 @@ def render_main_dashboard(ticker_input, exchange):
                 model = clone(base_ensemble)
                 model.fit(X, y_encoded)
                 
-                today_features = df.groupby('DateStr').tail(1).iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14']].to_frame().T
+                today_features = df.groupby('DateStr').tail(1).iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14']].to_frame().T.astype(float)
                 
                 if not today_features.isna().any().any():
                     prob_array = model.predict_proba(today_features)[0]
