@@ -239,7 +239,8 @@ def render_main_dashboard(ticker_input, exchange):
                         actual_lbl = get_amo_val(actual_y)
                         pred_lbl = get_amo_val(pred_y)
                         
-                        date_label = ml_df.iloc[test_idx]['DateStr']
+                        feature_date = ml_df.iloc[test_idx]['DateStr']
+                        date_label = date_to_next_date.get(feature_date, feature_date)
                         
                         if is_correct:
                             eval_results.append(f"<li style='margin-bottom: 4px;'><span style='color: #00C073;'>✅ {date_label}: Validated (Predicted {pred_lbl})</span></li>")
