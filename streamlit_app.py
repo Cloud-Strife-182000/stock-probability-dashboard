@@ -77,11 +77,12 @@ def render_main_dashboard(ticker_input, exchange):
             df_1d = data_1d.copy()
             if isinstance(df_1d.columns, pd.MultiIndex):
                 df_1d.columns = [col[0] if isinstance(col, tuple) else col for col in df_1d.columns]
-            df_1d = df_1d.reset_index()
-            
-            df_1d.index = pd.to_datetime(df_1d.index)
-            df_1d['DateStr'] = df_1d.index.strftime('%Y-%m-%d')
-            if len(df_1d) >= 14:
+            if 'Date' in df_1d.columns:
+                df_1d['DateStr'] = pd.to_datetime(df_1d['Date']).dt.strftime('%Y-%m-%d')
+            elif 'Datetime' in df_1d.columns:
+                df_1d['DateStr'] = pd.to_datetime(df_1d['Datetime']).dt.strftime('%Y-%m-%d')
+                
+            if 'Close' in df_1d.columns and len(df_1d) >= 14:
                 df_1d['Daily_SMA_5'] = df_1d['Close'].rolling(window=5).mean()
                 df_1d['Daily_ATR_14'] = df_1d.ta.atr(length=14)
                 df_1d['Daily_RSI_14'] = df_1d.ta.rsi(length=14)
