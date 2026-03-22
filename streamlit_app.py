@@ -125,18 +125,16 @@ def render_main_dashboard(ticker_input, exchange):
             df['Distance_to_Fast_SMA'] = (df['Close'] - df['Daily_SMA_5']) / df['Daily_SMA_5']
             df['ATR_Percent'] = df['Daily_ATR_14'] / df['Close']
             
-            # 4. ENGINEER AMO TARGET (10:15 Sustained Trend)
+            # 4. ENGINEER AMO TARGET (Positionally Anchored Sustained Trend)
             daily_targets = {}
             for date_str, group in df.groupby('DateStr'):
-                open_row = group[group['TimeStr'] == '09:15']
-                close_row = group[group['TimeStr'] == '10:15'] # Changed 10:45 to 10:15
-                
-                if open_row.empty or close_row.empty:
-                    continue # Skip days without the explicit 09:15 or 10:15 candle closure boundaries
+                group = group.sort_values(by='DatetimeObj')
+                if len(group) < 2:
+                    continue # Skip days without enough hourly candles
                     
-                open_price = open_row['Open'].values[0]
-                close_price = close_row['Close'].values[0]
-                daily_atr = open_row['Daily_ATR_14'].values[0]
+                open_price = group.iloc[0]['Open']
+                close_price = group.iloc[1]['Close']
+                daily_atr = group.iloc[0]['Daily_ATR_14']
                 atr_hurdle = daily_atr * 0.15
                 
                 if close_price >= open_price + atr_hurdle:
@@ -186,9 +184,9 @@ def render_main_dashboard(ticker_input, exchange):
                 
                 X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, shuffle=False)
                 
-                rf_model = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_leaf=15, random_state=42)
+                rf_model = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_leaf=15, class_weight='balanced', random_state=42)
                 xgb_model = XGBClassifier(n_estimators=100, max_depth=3, learning_rate=0.05, random_state=42, eval_metric='mlogloss', n_jobs=1)
-                lr_model = Pipeline([('scaler', StandardScaler()), ('lr', LogisticRegression(max_iter=1000, random_state=42))])
+                lr_model = Pipeline([('scaler', StandardScaler()), ('lr', LogisticRegression(max_iter=1000, class_weight='balanced', random_state=42))])
                 base_ensemble = VotingClassifier(estimators=[('rf', rf_model), ('xgb', xgb_model), ('lr', lr_model)], voting='soft')
                 
                 eval_model = clone(base_ensemble)
