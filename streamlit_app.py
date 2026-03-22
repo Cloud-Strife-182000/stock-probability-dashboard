@@ -193,7 +193,19 @@ def render_main_dashboard(ticker_input, exchange):
                 eval_model.fit(X_train, y_train)
                 test_accuracy = eval_model.score(X_test, y_test)
                 
-                baseline_accuracy = pd.Series(y_test).value_counts(normalize=True).max()
+                y_test_series = pd.Series(y_test)
+                baseline_accuracy = y_test_series.value_counts(normalize=True).max()
+                
+                baseline_class_encoded = y_test_series.value_counts(normalize=True).idxmax()
+                baseline_class_raw = le.inverse_transform([baseline_class_encoded])[0]
+                
+                if baseline_class_raw == 1.0:
+                    baseline_label = "LONG"
+                elif baseline_class_raw == -1.0:
+                    baseline_label = "SHORT"
+                else:
+                    baseline_label = "AVOID"
+                    
                 true_edge = test_accuracy - baseline_accuracy
                 
                 # 5-Day Walk-Forward Validation
@@ -280,6 +292,7 @@ def render_main_dashboard(ticker_input, exchange):
                         "accuracy": test_accuracy,
                         "baseline": baseline_accuracy,
                         "true_edge": true_edge,
+                        "baseline_label": baseline_label,
                         "samples": len(ml_df),
                         "importances": {
                             "Momentum": rf_inside_ensemble.feature_importances_[0],
@@ -407,7 +420,7 @@ def render_main_dashboard(ticker_input, exchange):
                         st.markdown(f"""
                         <ul style="list-style-type: none; padding-left: 0; margin-top: 10px; margin-bottom: 20px;">
                             <li><b>Predictive Accuracy:</b> {acc:.1f}%</li>
-                            <li><b>Baseline Accuracy:</b> {base:.1f}%</li>
+                            <li><b>Baseline Accuracy:</b> {base:.1f}% <span style="color: #666; font-size: 0.9em;">(Always guessing '{ml_details['baseline_label']}')</span></li>
                             <li><b>True Edge:</b> <span style="color: {edge_color}; font-weight: bold;">{edge:+.1f}%</span></li>
                         </ul>
                         """, unsafe_allow_html=True)
