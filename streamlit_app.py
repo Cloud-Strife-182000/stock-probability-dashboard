@@ -345,8 +345,10 @@ def render_main_dashboard(ticker_input, exchange):
             
             # 7. RENDER ML PREDICTION DOM
             if ml_pred_label:
-                today_ist = pd.Timestamp.today(tz='Asia/Kolkata')
-                next_day = today_ist + pd.Timedelta(days=1)
+                last_data_ts = pd.to_datetime(df['DateStr'].iloc[-1])
+                st.session_state['last_data_date'] = last_data_ts
+                
+                next_day = last_data_ts + pd.Timedelta(days=1)
                 if next_day.weekday() == 5:
                     next_day += pd.Timedelta(days=2)
                 elif next_day.weekday() == 6:
@@ -512,7 +514,10 @@ with tab2:
             styled_df.to_excel(writer, index=False, sheet_name='Watchlist')
         return buffer.getvalue()
         
-    next_market_day = today_ist + pd.Timedelta(days=1)
+    last_data_ts = st.session_state.get('last_data_date', today_ist)
+    next_market_day = last_data_ts + pd.Timedelta(days=1)
+    
+    # If the default fallback (today_ist) was used AND it's a weekend, or explicitly jumping weekends 
     if next_market_day.weekday() == 5:
         next_market_day += pd.Timedelta(days=2)
     elif next_market_day.weekday() == 6:
