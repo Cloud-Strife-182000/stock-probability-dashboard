@@ -79,14 +79,12 @@ def render_main_dashboard(ticker_input, exchange):
                 df_1d.columns = [col[0] if isinstance(col, tuple) else col for col in df_1d.columns]
             df_1d = df_1d.reset_index()
             
-            if 'Date' in df_1d.columns:
-                df_1d['DateStr'] = pd.to_datetime(df_1d['Date']).dt.strftime('%Y-%m-%d')
-            elif 'Datetime' in df_1d.columns:
-                df_1d['DateStr'] = pd.to_datetime(df_1d['Datetime']).dt.strftime('%Y-%m-%d')
-                
-            if 'Close' in df_1d.columns:
+            df_1d.index = pd.to_datetime(df_1d.index)
+            df_1d['DateStr'] = df_1d.index.strftime('%Y-%m-%d')
+            if len(df_1d) >= 14:
                 df_1d['Daily_SMA_5'] = df_1d['Close'].rolling(window=5).mean()
                 df_1d['Daily_ATR_14'] = df_1d.ta.atr(length=14)
+                df_1d['Daily_RSI_14'] = df_1d.ta.rsi(length=14)
                 
             # 2. PROCESS 1h DATA
             df = data_1h.copy() # Changed data_15m to data_1h
@@ -110,10 +108,11 @@ def render_main_dashboard(ticker_input, exchange):
             df['Closing_Volume_Surge'] = df['Volume'] / df['Volume'].rolling(window=35).mean() # Changed window to 35
             
             # 3. MERGE DAILY DATA
-            daily_subset = df_1d[['DateStr', 'Daily_SMA_5', 'Daily_ATR_14']].dropna()
+            daily_subset = df_1d[['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14']].dropna()
             df = pd.merge(df, daily_subset, on='DateStr', how='left')
             df['Daily_SMA_5'] = df['Daily_SMA_5'].ffill()
             df['Daily_ATR_14'] = df['Daily_ATR_14'].ffill()
+            df['Daily_RSI_14'] = df['Daily_RSI_14'].ffill()
             
             df['Distance_to_Fast_SMA'] = (df['Close'] - df['Daily_SMA_5']) / df['Daily_SMA_5']
             df['ATR_Percent'] = df['Daily_ATR_14'] / df['Close']
@@ -154,7 +153,7 @@ def render_main_dashboard(ticker_input, exchange):
                 return float('nan')
                 
             ml_df['Target'] = ml_df.apply(map_target, axis=1)
-            ml_df = ml_df.dropna(subset=['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Target'])
+            ml_df = ml_df.dropna(subset=['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'Target'])
             
             bullish_prob = None
             ml_details = None
@@ -171,11 +170,11 @@ def render_main_dashboard(ticker_input, exchange):
             latest_result_html = ""
             
             if len(ml_df) > 10:
-                X = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent']]
+                X = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14']]
                 y = ml_df['Target']
                 
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
-                eval_model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=42)
+                eval_model = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_leaf=15, random_state=42)
                 eval_model.fit(X_train, y_train)
                 test_accuracy = eval_model.score(X_test, y_test)
                 
@@ -183,7 +182,7 @@ def render_main_dashboard(ticker_input, exchange):
                 true_edge = test_accuracy - baseline_accuracy
                 
                 # Eliminate Data Leakage: Train an isolated model predicting the final completed day without seeing its target
-                eval_last_model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=42)
+                eval_last_model = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_leaf=15, random_state=42)
                 eval_last_model.fit(X.iloc[:-1], y.iloc[:-1])
                 
                 # Check actual performance on the most recently completed day
@@ -202,10 +201,10 @@ def render_main_dashboard(ticker_input, exchange):
                 latest_result_html = f"<span style='color: #00C073;'>✅ Validated (Predicted: {pred_lbl})</span>" if is_correct else f"<span style='color: #FF2B2B;'>❌ Failed (Predicted: {pred_lbl}, Actual: {actual_lbl})</span>"
                 
                 # Primary model must train on ALL data for Tomorrow's forecast
-                model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=42)
+                model = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_leaf=15, random_state=42)
                 model.fit(X, y)
                 
-                today_features = df.groupby('DateStr').tail(1).iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent']].to_frame().T
+                today_features = df.groupby('DateStr').tail(1).iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14']].to_frame().T
                 
                 if not today_features.isna().any().any():
                     prob_array = model.predict_proba(today_features)[0]
@@ -243,7 +242,8 @@ def render_main_dashboard(ticker_input, exchange):
                             "Momentum": model.feature_importances_[0],
                             "Vol Surge": model.feature_importances_[1],
                             "Dist to SMA5": model.feature_importances_[2],
-                            "ATR %": model.feature_importances_[3]
+                            "ATR %": model.feature_importances_[3],
+                            "Daily RSI": model.feature_importances_[4]
                         }
                     }
             
@@ -263,7 +263,7 @@ def render_main_dashboard(ticker_input, exchange):
             st.write("")
             latest_day = df.iloc[-1]
             
-            cols = st.columns(5)
+            cols = st.columns(6)
             close_val = f"₹{latest_day['Close']:.2f}" if 'Close' in df.columns and pd.notna(latest_day['Close']) else "N/A"
             render_indicator(cols[0], "Current Close", close_val, "#1D4ED8")
             
@@ -282,6 +282,10 @@ def render_main_dashboard(ticker_input, exchange):
             atr_v = latest_day['ATR_Percent'] if 'ATR_Percent' in latest_day else float('nan')
             atr_str = f"{atr_v*100:.2f}%" if pd.notna(atr_v) else "N/A"
             render_indicator(cols[4], "Volatility (%)", atr_str)
+            
+            rsi_v = latest_day['Daily_RSI_14'] if 'Daily_RSI_14' in latest_day else float('nan')
+            rsi_str = f"{rsi_v:.1f}" if pd.notna(rsi_v) else "N/A"
+            render_indicator(cols[5], "Daily RSI", rsi_str)
             
             # 7. RENDER ML PREDICTION DOM
             if ml_pred_label:
@@ -374,7 +378,7 @@ def render_main_dashboard(ticker_input, exchange):
                         st.bar_chart(fi_df, height=200)
                         
                         st.markdown("**AMO Feature Correlation Matrix:**")
-                        ml_features = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Target']]
+                        ml_features = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'Target']]
                         styled_corr = ml_features.corr().style.background_gradient(cmap="Oranges").format("{:.2f}")
                         st.dataframe(styled_corr, use_container_width=True)
                         
