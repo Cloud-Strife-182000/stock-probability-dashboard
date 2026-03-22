@@ -20,16 +20,22 @@ def fetch_stock_data(ticker, exch):
     suffix = ".NS" if exch == "NSE" else ".BS"
     sym = f"{ticker}{suffix}"
     
-    data_1d = yf.download(sym, period="1y", interval="1d", progress=False)
-    if data_1d.empty and exch == "BSE":
+    # Fetch intraday data using yfinance
+    stock = yf.Ticker(sym)
+    df = stock.history(period="730d", interval="1h") # Changed to 730d, 1h
+    
+    # If 1h data is empty for BSE, try .BO suffix
+    if df.empty and exch == "BSE":
         sym_bo = f"{ticker}.BO"
-        data_1d = yf.download(sym_bo, period="1y", interval="1d", progress=False)
-        if not data_1d.empty:
+        stock_bo = yf.Ticker(sym_bo)
+        df = stock_bo.history(period="730d", interval="1h")
+        if not df.empty:
             sym = sym_bo
             
-    data_15m = yf.download(sym, period="60d", interval="15m", progress=False)
+    # Fetch daily data explicitly to calculate moving averages smoothly
+    df_1d = stock.history(period="2y", interval="1d") # Changed to 2y
     
-    return data_1d, data_15m, sym
+    return df_1d, df, sym # Changed return order and variable name
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def get_top_news(ticker):
@@ -61,9 +67,9 @@ with col2:
 def render_main_dashboard(ticker_input, exchange):
     with st.spinner(f"Fetching data and calculating indicators for {ticker_input}..."):
         try:
-            data_1d, data_15m, symbol = fetch_stock_data(ticker_input, exchange)
+            data_1d, data_1h, symbol = fetch_stock_data(ticker_input, exchange) # Changed data_15m to data_1h
             
-            if data_1d.empty or data_15m.empty:
+            if data_1d.empty or data_1h.empty: # Changed data_15m to data_1h
                 st.warning(f"No data found for {ticker_input}. Please check the ticker symbol.")
                 st.stop()
             
@@ -82,8 +88,8 @@ def render_main_dashboard(ticker_input, exchange):
                 df_1d['Daily_SMA_5'] = df_1d['Close'].rolling(window=5).mean()
                 df_1d['Daily_ATR_14'] = df_1d.ta.atr(length=14)
                 
-            # 2. PROCESS 15m DATA
-            df = data_15m.copy()
+            # 2. PROCESS 1h DATA
+            df = data_1h.copy() # Changed data_15m to data_1h
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns]
             df = df.reset_index()
@@ -99,9 +105,9 @@ def render_main_dashboard(ticker_input, exchange):
             df['DateStr'] = df['DatetimeObj'].dt.strftime('%Y-%m-%d')
             df['TimeStr'] = df['DatetimeObj'].dt.strftime('%H:%M')
             
-            # Calculate rolling indicators directly on 15m chart
-            df['Closing_Momentum'] = (df['Close'] - df['Close'].shift(4)) / df['Close'].shift(4)
-            df['Closing_Volume_Surge'] = df['Volume'] / df['Volume'].rolling(window=20).mean()
+            # Calculate rolling indicators directly on 1h chart
+            df['Closing_Momentum'] = (df['Close'] - df['Open']) / df['Open'] # Changed momentum calculation
+            df['Closing_Volume_Surge'] = df['Volume'] / df['Volume'].rolling(window=35).mean() # Changed window to 35
             
             # 3. MERGE DAILY DATA
             daily_subset = df_1d[['DateStr', 'Daily_SMA_5', 'Daily_ATR_14']].dropna()
@@ -112,14 +118,14 @@ def render_main_dashboard(ticker_input, exchange):
             df['Distance_to_Fast_SMA'] = (df['Close'] - df['Daily_SMA_5']) / df['Daily_SMA_5']
             df['ATR_Percent'] = df['Daily_ATR_14'] / df['Close']
             
-            # 4. ENGINEER AMO TARGET (10:45 Sustained Trend)
+            # 4. ENGINEER AMO TARGET (10:15 Sustained Trend)
             daily_targets = {}
             for date_str, group in df.groupby('DateStr'):
                 open_row = group[group['TimeStr'] == '09:15']
-                close_row = group[group['TimeStr'] == '10:45']
+                close_row = group[group['TimeStr'] == '10:15'] # Changed 10:45 to 10:15
                 
                 if open_row.empty or close_row.empty:
-                    continue # Skip days without the explicit 09:15 or 10:45 candle closure boundaries
+                    continue # Skip days without the explicit 09:15 or 10:15 candle closure boundaries
                     
                 open_price = open_row['Open'].values[0]
                 close_price = close_row['Close'].values[0]
@@ -133,21 +139,21 @@ def render_main_dashboard(ticker_input, exchange):
                 else:
                     daily_targets[date_str] = 0.0
             
-            # Shift AMO Target backward to the PREVIOUS available 15:15 node
-            unique_dates = sorted(df['DateStr'].unique())
-            date_to_next_date = {unique_dates[i]: unique_dates[i+1] for i in range(len(unique_dates)-1)}
+            # 5. ML DATASET FILTRATION (Strictly Final Hourly Candles)
+            ml_df = df.groupby('DateStr').tail(1).copy() # Changed filtration logic
             
+            date_to_next_date = {}
+            dates = sorted(list(daily_targets.keys()))
+            for i in range(len(dates) - 1):
+                date_to_next_date[dates[i]] = dates[i+1]
+                
             def map_target(row):
-                if row['TimeStr'] == '15:15':
-                    next_date = date_to_next_date.get(row['DateStr'])
-                    if next_date and next_date in daily_targets:
-                        return daily_targets[next_date]
+                next_date = date_to_next_date.get(row['DateStr'])
+                if next_date and next_date in daily_targets:
+                    return daily_targets[next_date]
                 return float('nan')
                 
-            df['Target'] = df.apply(map_target, axis=1)
-            
-            # 5. ML DATASET FILTRATION & TRAINING (Strictly 15:15 timestamps)
-            ml_df = df[df['TimeStr'] == '15:15'].copy()
+            ml_df['Target'] = ml_df.apply(map_target, axis=1)
             ml_df = ml_df.dropna(subset=['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Target'])
             
             bullish_prob = None
@@ -199,7 +205,7 @@ def render_main_dashboard(ticker_input, exchange):
                 model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=42)
                 model.fit(X, y)
                 
-                today_features = df[df['TimeStr'] == '15:15'].iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent']].to_frame().T
+                today_features = df.groupby('DateStr').tail(1).iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent']].to_frame().T
                 
                 if not today_features.isna().any().any():
                     prob_array = model.predict_proba(today_features)[0]
@@ -325,7 +331,7 @@ def render_main_dashboard(ticker_input, exchange):
                             <p style="margin: 0; font-size: 1rem; color: #555; text-transform: uppercase; font-weight: 600;">Latest Live Session Evaluation</p>
                             <h4 style="margin: 5px 0 0 0; font-size: 1.1rem;">{latest_result_html}</h4>
                         </div>
-                        <p style="color: {ml_color}; font-size: 1.1rem; margin-top: 20px;"><em>Multi-class Random Forest Matrix targeting sustained (10:45 AM) close thresholds</em></p>
+                        <p style="color: {ml_color}; font-size: 1.1rem; margin-top: 20px;"><em>Multi-class Random Forest Matrix targeting sustained (10:15 AM) close thresholds</em></p>
                     </div>
                     """,
                     unsafe_allow_html=True
@@ -343,7 +349,7 @@ def render_main_dashboard(ticker_input, exchange):
                     """, unsafe_allow_html=True)
                     
                     with st.expander("View AMO Machine Learning Model Details", expanded=False):
-                        st.markdown(f"**Valid 15:15 Training Intervals:** {ml_details['samples']} market sessions")
+                        st.markdown(f"**Valid Hourly Training Intervals:** {ml_details['samples']} market sessions")
                         
                         acc = ml_details['accuracy'] * 100
                         base = ml_details['baseline'] * 100
@@ -372,8 +378,8 @@ def render_main_dashboard(ticker_input, exchange):
                         styled_corr = ml_features.corr().style.background_gradient(cmap="Oranges").format("{:.2f}")
                         st.dataframe(styled_corr, use_container_width=True)
                         
-                    with st.expander("View Raw 15:15 Machine Learning Training Data", expanded=False):
-                        st.markdown("This targeted intraday matrix maps exclusively the `15:15` closing datasets evaluated natively across 60 days exactly against the sustained 10:45 AM close target thresholds:")
+                    with st.expander("View Raw Hourly Machine Learning Training Data", expanded=False):
+                        st.markdown("This targeted intraday matrix maps exclusively the final hourly closing datasets evaluated natively across 730 days exactly against the sustained 10:15 AM close target thresholds:")
                         display_df = ml_df.copy()
                         display_df = display_df.set_index('DateStr')
                         st.dataframe(display_df, use_container_width=True)
