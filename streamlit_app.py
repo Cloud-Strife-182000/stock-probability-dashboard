@@ -176,13 +176,14 @@ def render_main_dashboard(ticker_input, exchange):
                 baseline_accuracy = y_test.value_counts(normalize=True).max()
                 true_edge = test_accuracy - baseline_accuracy
                 
-                model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=42)
-                model.fit(X, y)
+                # Eliminate Data Leakage: Train an isolated model predicting the final completed day without seeing its target
+                eval_last_model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=42)
+                eval_last_model.fit(X.iloc[:-1], y.iloc[:-1])
                 
                 # Check actual performance on the most recently completed day
                 last_X = X.iloc[[-1]]
                 last_y = y.iloc[-1]
-                last_pred = model.predict(last_X)[0]
+                last_pred = eval_last_model.predict(last_X)[0]
                 
                 def get_amo_val(val):
                     if val == 1.0: return "LONG"
@@ -193,6 +194,10 @@ def render_main_dashboard(ticker_input, exchange):
                 actual_lbl = get_amo_val(last_y)
                 pred_lbl = get_amo_val(last_pred)
                 latest_result_html = f"<span style='color: #00C073;'>✅ Validated (Predicted: {pred_lbl})</span>" if is_correct else f"<span style='color: #FF2B2B;'>❌ Failed (Predicted: {pred_lbl}, Actual: {actual_lbl})</span>"
+                
+                # Primary model must train on ALL data for Tomorrow's forecast
+                model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=42)
+                model.fit(X, y)
                 
                 today_features = df[df['TimeStr'] == '15:15'].iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent']].to_frame().T
                 
