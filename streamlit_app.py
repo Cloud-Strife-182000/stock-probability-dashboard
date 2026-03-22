@@ -187,7 +187,7 @@ def render_main_dashboard(ticker_input, exchange):
                 X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, shuffle=False)
                 
                 rf_model = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_leaf=15, random_state=42)
-                xgb_model = XGBClassifier(n_estimators=100, max_depth=3, learning_rate=0.05, random_state=42, eval_metric='mlogloss')
+                xgb_model = XGBClassifier(n_estimators=100, max_depth=3, learning_rate=0.05, random_state=42, eval_metric='mlogloss', n_jobs=1)
                 lr_model = Pipeline([('scaler', StandardScaler()), ('lr', LogisticRegression(max_iter=1000, random_state=42))])
                 base_ensemble = VotingClassifier(estimators=[('rf', rf_model), ('xgb', xgb_model), ('lr', lr_model)], voting='soft')
                 
