@@ -196,25 +196,50 @@ def render_main_dashboard(ticker_input, exchange):
                 baseline_accuracy = pd.Series(y_test).value_counts(normalize=True).max()
                 true_edge = test_accuracy - baseline_accuracy
                 
-                # Eliminate Data Leakage: Train an isolated model predicting the final completed day without seeing its target
-                eval_last_model = clone(base_ensemble)
-                eval_last_model.fit(X.iloc[:-1], y_encoded[:-1])
-                
-                # Check actual performance on the most recently completed day
-                last_X = X.iloc[[-1]]
-                last_y = y.iloc[-1]
-                last_pred_encoded = eval_last_model.predict(last_X)[0]
-                last_pred = le.inverse_transform([last_pred_encoded])[0]
-                
+                # 5-Day Walk-Forward Validation
                 def get_amo_val(val):
                     if val == 1.0: return "LONG"
                     elif val == -1.0: return "SHORT"
                     return "AVOID"
                     
-                is_correct = (last_pred == last_y)
-                actual_lbl = get_amo_val(last_y)
-                pred_lbl = get_amo_val(last_pred)
-                latest_result_html = f"<span style='color: #00C073;'>✅ Validated (Predicted: {pred_lbl})</span>" if is_correct else f"<span style='color: #FF2B2B;'>❌ Failed (Predicted: {pred_lbl}, Actual: {actual_lbl})</span>"
+                lookback_days = min(5, len(X) - 2)
+                correct_count = 0
+                eval_results = []
+                
+                if lookback_days > 0:
+                    for i in range(1, lookback_days + 1):
+                        test_idx = -i
+                        eval_wf_model = clone(base_ensemble)
+                        
+                        eval_wf_model.fit(X.iloc[:test_idx], y_encoded[:test_idx])
+                            
+                        # Process single validation day
+                        test_X = X.iloc[[test_idx]]
+                        actual_y = y.iloc[test_idx]
+                        
+                        pred_encoded = eval_wf_model.predict(test_X)[0]
+                        pred_y = le.inverse_transform([pred_encoded])[0]
+                        
+                        is_correct = (pred_y == actual_y)
+                        if is_correct:
+                            correct_count += 1
+                            
+                        actual_lbl = get_amo_val(actual_y)
+                        pred_lbl = get_amo_val(pred_y)
+                        
+                        date_label = ml_df.iloc[test_idx]['DateStr']
+                        
+                        if is_correct:
+                            eval_results.append(f"<li style='margin-bottom: 4px;'><span style='color: #00C073;'>✅ {date_label}: Validated (Predicted {pred_lbl})</span></li>")
+                        else:
+                            eval_results.append(f"<li style='margin-bottom: 4px;'><span style='color: #FF2B2B;'>❌ {date_label}: Failed (Pred {pred_lbl} ≠ Act {actual_lbl})</span></li>")
+                            
+                    eval_results.reverse() # Show oldest to newest
+                    
+                    latest_result_html = f"<div style='margin-bottom: 8px;'><b style='color: black;'>Recent Regime Sync: {correct_count}/{lookback_days} Correct</b></div>"
+                    latest_result_html += f"<ul style='list-style-type: none; padding-left: 0; margin: 0; font-size: 0.95rem;'>" + "".join(eval_results) + "</ul>"
+                else:
+                    latest_result_html = "<span>Not enough data for 5-Day Validation.</span>"
                 
                 # Primary model must train on ALL data for Tomorrow's forecast
                 model = clone(base_ensemble)
@@ -350,10 +375,10 @@ def render_main_dashboard(ticker_input, exchange):
                             </div>
                         </div>
                         <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid rgba(0,0,0,0.05);">
-                            <p style="margin: 0; font-size: 1rem; color: #555; text-transform: uppercase; font-weight: 600;">Latest Live Session Evaluation</p>
-                            <h4 style="margin: 5px 0 0 0; font-size: 1.1rem;">{latest_result_html}</h4>
+                            <p style="margin: 0; font-size: 1rem; color: #555; text-transform: uppercase; font-weight: 600; margin-bottom: 10px;">5-Day Walk-Forward Validation</p>
+                            <div style="text-align: left; padding: 8px; border-radius: 6px; border: 1px solid #DDD; display: inline-block;">{latest_result_html}</div>
                         </div>
-                        <p style="color: {ml_color}; font-size: 1.1rem; margin-top: 20px;"><em>Multi-class Random Forest Matrix targeting sustained (10:15 AM) close thresholds</em></p>
+                        <p style="color: {ml_color}; font-size: 1.1rem; margin-top: 20px;"><em>Multi-class Heterogeneous Ensemble targeting sustained (10:15 AM) close thresholds</em></p>
                     </div>
                     """,
                     unsafe_allow_html=True
@@ -454,7 +479,7 @@ with tab2:
                 "Model Accuracy (%)": round(info['acc'], 1),
                 "Baseline Accuracy (%)": round(info.get('baseline', 0.0), 1),
                 "True Edge (%)": round(info.get('edge', 0.0), 1),
-                "Latest Result": 'Correct' if '✅' in info.get('latest_result', '') else ('Incorrect' if '❌' in info.get('latest_result', '') else 'N/A')
+                "Latest Result": info.get('latest_result', '').split('Recent Regime Sync: ')[1].split(' Correct')[0] if 'Recent Regime Sync:' in info.get('latest_result', '') else 'N/A'
             })
             color_map[ticker] = info.get('color', '#D99300')
             
@@ -526,8 +551,8 @@ with tab2:
                     </div>
                 </div>
                 <div style="margin-top: 5px; margin-bottom: 20px; text-align: center;">
-                    <p style="margin: 0; font-size: 0.85rem; color: #555; text-transform: uppercase; font-weight: 600;">Latest Live Session Evaluation</p>
-                    <p style="margin: 5px 0 0 0; font-size: 1rem;">{w_data.get('latest_result', 'N/A')}</p>
+                    <p style="margin: 0; font-size: 0.85rem; color: #555; text-transform: uppercase; font-weight: 600; margin-bottom: 10px;">5-Day Walk-Forward Validation</p>
+                    <div style="text-align: left; padding: 8px; border-radius: 6px; border: 1px solid #DDD; display: inline-block;">{w_data.get('latest_result', 'N/A')}</div>
                 </div>
                 <div style="display: flex; justify-content: space-between; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 15px;">
                     <div style="flex: 1; text-align: center; border-right: 1px solid rgba(0,0,0,0.05);">
