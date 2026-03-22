@@ -10,8 +10,13 @@ import xml.etree.ElementTree as ET
 import io
 import datetime
 
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 from sklearn.model_selection import train_test_split
+from xgboost import XGBClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.pipeline import Pipeline
+from sklearn.base import clone
 
 st.set_page_config(page_title="Stock Probability Dashboard", layout="wide")
 
@@ -176,22 +181,32 @@ def render_main_dashboard(ticker_input, exchange):
                 X = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14']]
                 y = ml_df['Target']
                 
-                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
-                eval_model = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_leaf=15, random_state=42)
+                le = LabelEncoder()
+                y_encoded = le.fit_transform(y)
+                
+                X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, shuffle=False)
+                
+                rf_model = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_leaf=15, random_state=42)
+                xgb_model = XGBClassifier(n_estimators=100, max_depth=3, learning_rate=0.05, random_state=42, eval_metric='mlogloss')
+                lr_model = Pipeline([('scaler', StandardScaler()), ('lr', LogisticRegression(max_iter=1000, random_state=42))])
+                base_ensemble = VotingClassifier(estimators=[('rf', rf_model), ('xgb', xgb_model), ('lr', lr_model)], voting='soft')
+                
+                eval_model = clone(base_ensemble)
                 eval_model.fit(X_train, y_train)
                 test_accuracy = eval_model.score(X_test, y_test)
                 
-                baseline_accuracy = y_test.value_counts(normalize=True).max()
+                baseline_accuracy = pd.Series(y_test).value_counts(normalize=True).max()
                 true_edge = test_accuracy - baseline_accuracy
                 
                 # Eliminate Data Leakage: Train an isolated model predicting the final completed day without seeing its target
-                eval_last_model = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_leaf=15, random_state=42)
-                eval_last_model.fit(X.iloc[:-1], y.iloc[:-1])
+                eval_last_model = clone(base_ensemble)
+                eval_last_model.fit(X.iloc[:-1], y_encoded[:-1])
                 
                 # Check actual performance on the most recently completed day
                 last_X = X.iloc[[-1]]
                 last_y = y.iloc[-1]
-                last_pred = eval_last_model.predict(last_X)[0]
+                last_pred_encoded = eval_last_model.predict(last_X)[0]
+                last_pred = le.inverse_transform([last_pred_encoded])[0]
                 
                 def get_amo_val(val):
                     if val == 1.0: return "LONG"
@@ -204,16 +219,17 @@ def render_main_dashboard(ticker_input, exchange):
                 latest_result_html = f"<span style='color: #00C073;'>✅ Validated (Predicted: {pred_lbl})</span>" if is_correct else f"<span style='color: #FF2B2B;'>❌ Failed (Predicted: {pred_lbl}, Actual: {actual_lbl})</span>"
                 
                 # Primary model must train on ALL data for Tomorrow's forecast
-                model = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_leaf=15, random_state=42)
-                model.fit(X, y)
+                model = clone(base_ensemble)
+                model.fit(X, y_encoded)
                 
                 today_features = df.groupby('DateStr').tail(1).iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14']].to_frame().T
                 
                 if not today_features.isna().any().any():
                     prob_array = model.predict_proba(today_features)[0]
-                    pred_class = model.predict(today_features)[0]
+                    pred_class_encoded = model.predict(today_features)[0]
+                    pred_class = le.inverse_transform([pred_class_encoded])[0]
                     
-                    class_labels = list(model.classes_)
+                    class_labels = list(le.inverse_transform(model.classes_))
                     try:
                         prob_long = prob_array[class_labels.index(1.0)] * 100 if 1.0 in class_labels else 0.0
                         prob_short = prob_array[class_labels.index(-1.0)] * 100 if -1.0 in class_labels else 0.0
@@ -236,17 +252,18 @@ def render_main_dashboard(ticker_input, exchange):
                         
                     prob_pct = max(prob_array) * 100
                     
+                    rf_inside_ensemble = model.named_estimators_['rf']
                     ml_details = {
                         "accuracy": test_accuracy,
                         "baseline": baseline_accuracy,
                         "true_edge": true_edge,
                         "samples": len(ml_df),
                         "importances": {
-                            "Momentum": model.feature_importances_[0],
-                            "Vol Surge": model.feature_importances_[1],
-                            "Dist to SMA5": model.feature_importances_[2],
-                            "ATR %": model.feature_importances_[3],
-                            "Daily RSI": model.feature_importances_[4]
+                            "Momentum": rf_inside_ensemble.feature_importances_[0],
+                            "Vol Surge": rf_inside_ensemble.feature_importances_[1],
+                            "Dist to SMA5": rf_inside_ensemble.feature_importances_[2],
+                            "ATR %": rf_inside_ensemble.feature_importances_[3],
+                            "Daily RSI": rf_inside_ensemble.feature_importances_[4]
                         }
                     }
             
