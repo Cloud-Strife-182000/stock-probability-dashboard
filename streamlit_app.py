@@ -263,21 +263,27 @@ def render_main_dashboard(ticker_input, exchange):
                 else:
                     latest_result_html = "<span>Not enough data for 5-Day Validation.</span>"
                 
-                # Primary model must train on ALL data for Tomorrow's forecast
+                # Primary model must train strictly preserving out-of-sample prediction integrity
                 model = clone(base_ensemble)
-                model.fit(X, y_encoded)
                 
                 today_ist = pd.Timestamp.today(tz='Asia/Kolkata')
                 last_df_date_str = df['DateStr'].iloc[-1]
                 
                 if today_ist.hour < 16 and last_df_date_str == today_ist.strftime('%Y-%m-%d'):
                     # Market is still open. Predict for TODAY using YESTERDAY's data.
+                    # CRITICAL: Since today's 10:15 close exists in the dataset, yesterday's row in X 
+                    # now contains today's true target. To prevent data leakage, we must exclude the 
+                    # final row of X from the training set when generating the 'Current Day' prediction!
+                    model.fit(X.iloc[:-1], y_encoded[:-1])
+                    
                     available_dates = list(df['DateStr'].unique())
                     feature_day_str = available_dates[-2] if len(available_dates) > 1 else available_dates[-1]
                     today_features = df[df['DateStr'] == feature_day_str].tail(1)[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14']].astype(float)
                     st.session_state['forecast_type'] = "Current Day"
                 else:
                     # Market is closed (>= 4PM). Predict for TOMORROW using TODAY's data.
+                    model.fit(X, y_encoded)
+                    
                     today_features = df.groupby('DateStr').tail(1).iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14']].to_frame().T.astype(float)
                     st.session_state['forecast_type'] = "Next Day"
 
