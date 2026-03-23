@@ -608,6 +608,16 @@ def render_main_dashboard(ticker_input, exchange, selected_features):
                         display_df = ml_df[selected_features + ['Target', 'DateStr']].copy()
                         display_df = display_df.set_index('DateStr')
                         st.dataframe(display_df, use_container_width=True)
+                    
+                    with st.expander("🔍 View Today's Feature Snapshot (Prediction Input)", expanded=False):
+                        st.markdown("This is the **single feature row** the model used to generate today's forecast. All values are sourced from the most recent available session:")
+                        if today_features is not None and not today_features.empty:
+                            snapshot_df = today_features.copy()
+                            snapshot_df.index = [st.session_state.get('last_ticker', symbol)]
+                            snapshot_df.index.name = "Ticker"
+                            st.dataframe(snapshot_df.T.rename(columns={snapshot_df.index[0]: "Value"}).style.format("{:.4f}"), use_container_width=True)
+                        else:
+                            st.warning("Feature snapshot is unavailable — today's data may still be loading.")
                         
             with st.expander(f"View Latest Market News on {symbol}", expanded=False):
                 news_articles = get_top_news(ticker_input)
