@@ -272,8 +272,10 @@ def render_main_dashboard(ticker_input, exchange, selected_features):
                 else:
                     daily_targets[date_str] = -1.0
             
-            # 5. ML DATASET FILTRATION (Strictly Final Hourly Candles)
-            ml_df = df.groupby('DateStr').tail(1).copy() # Changed filtration logic
+            # 5. ML DATASET FILTRATION (Strictly Morning Hourly Candles)
+            # We anchor on 10:15 AM because this is the window where the prediction decision is made 
+            # and the morning indicators like 'Morning_Autocorr' are finalized.
+            ml_df = df[df['TimeStr'] == '10:15'].copy()
             
             date_to_next_date = {}
             dates = sorted(list(daily_targets.keys()))
@@ -408,7 +410,13 @@ def render_main_dashboard(ticker_input, exchange, selected_features):
                     # Market is closed (>= 4PM). Predict for TOMORROW using TODAY's data.
                     model.fit(X, y)
                     
-                    today_features = df.groupby('DateStr').tail(1).iloc[-1][selected_features].to_frame().T.astype(float)
+                    # Consistent anchoring: Use ONLY the 10:15 AM candle features for prediction
+                    recent_1015 = df[df['TimeStr'] == '10:15']
+                    if not recent_1015.empty:
+                        today_features = recent_1015.iloc[-1][selected_features].to_frame().T.astype(float)
+                    else:
+                        today_features = df.groupby('DateStr').tail(1).iloc[-1][selected_features].to_frame().T.astype(float)
+                    
                     st.session_state['forecast_type'] = "Next Day"
 
                 if not today_features.isna().any().any():
