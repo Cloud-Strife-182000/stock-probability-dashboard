@@ -258,8 +258,20 @@ def render_main_dashboard(ticker_input, exchange):
                 model = clone(base_ensemble)
                 model.fit(X, y_encoded)
                 
-                today_features = df.groupby('DateStr').tail(1).iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14']].to_frame().T.astype(float)
+                today_ist = pd.Timestamp.today(tz='Asia/Kolkata')
+                last_df_date_str = df['DateStr'].iloc[-1]
                 
+                if today_ist.hour < 16 and last_df_date_str == today_ist.strftime('%Y-%m-%d'):
+                    # Market is still open. Predict for TODAY using YESTERDAY's data.
+                    available_dates = list(df['DateStr'].unique())
+                    feature_day_str = available_dates[-2] if len(available_dates) > 1 else available_dates[-1]
+                    today_features = df[df['DateStr'] == feature_day_str].tail(1)[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14']].astype(float)
+                    st.session_state['forecast_type'] = "Current Day"
+                else:
+                    # Market is closed (>= 4PM). Predict for TOMORROW using TODAY's data.
+                    today_features = df.groupby('DateStr').tail(1).iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14']].to_frame().T.astype(float)
+                    st.session_state['forecast_type'] = "Next Day"
+
                 if not today_features.isna().any().any():
                     prob_array = model.predict_proba(today_features)[0]
                     pred_class_encoded = model.predict(today_features)[0]
@@ -346,16 +358,21 @@ def render_main_dashboard(ticker_input, exchange):
             
             # 7. RENDER ML PREDICTION DOM
             if ml_pred_label:
-                last_data_ts = pd.to_datetime(df['DateStr'].iloc[-1])
-                st.session_state['last_data_date'] = last_data_ts
+                last_df_date = pd.to_datetime(df['DateStr'].iloc[-1])
+                forecast_type = st.session_state.get('forecast_type', "Next Day")
                 
-                next_day = last_data_ts + pd.Timedelta(days=1)
-                if next_day.weekday() == 5:
-                    next_day += pd.Timedelta(days=2)
-                elif next_day.weekday() == 6:
-                    next_day += pd.Timedelta(days=1)
+                if forecast_type == "Current Day":
+                    prediction_ts = last_df_date
+                    forecast_title = f"AMO Current Day Forecast ({prediction_ts.strftime('%A, %b %d, %Y')})"
+                else:
+                    prediction_ts = last_df_date + pd.Timedelta(days=1)
+                    if prediction_ts.weekday() == 5:
+                        prediction_ts += pd.Timedelta(days=2)
+                    elif prediction_ts.weekday() == 6:
+                        prediction_ts += pd.Timedelta(days=1)
+                    forecast_title = f"AMO Next Day Forecast ({prediction_ts.strftime('%A, %b %d, %Y')})"
                     
-                forecast_title = f"AMO Intraday Volatility Forecast ({next_day.strftime('%A, %b %d, %Y')})"
+                st.session_state['last_data_date'] = prediction_ts
                 
                 st.session_state['watchlist'][symbol] = {
                     'prob': prob_pct, 
@@ -515,17 +532,18 @@ with tab2:
             styled_df.to_excel(writer, index=False, sheet_name='Watchlist')
         return buffer.getvalue()
         
-    last_data_ts = st.session_state.get('last_data_date', today_ist)
-    next_market_day = last_data_ts + pd.Timedelta(days=1)
+    prediction_ts = st.session_state.get('last_data_date', today_ist)
+    forecast_type = st.session_state.get('forecast_type', "Next Day")
     
-    # If the default fallback (today_ist) was used AND it's a weekend, or explicitly jumping weekends 
-    if next_market_day.weekday() == 5:
-        next_market_day += pd.Timedelta(days=2)
-    elif next_market_day.weekday() == 6:
-        next_market_day += pd.Timedelta(days=1)
-        
-    global_next_day_str = next_market_day.strftime('%A, %b %d, %Y')
-    st.markdown(f"<p style='color: #666; font-style: italic; margin-top: -10px;'>All model predictions are forecasting for the next active AMO session: <b>{global_next_day_str}</b></p>", unsafe_allow_html=True)
+    if 'last_data_date' not in st.session_state:
+        # Fallback if app just loaded without main dashboard run
+        prediction_ts = prediction_ts + pd.Timedelta(days=1)
+        if prediction_ts.weekday() == 5: prediction_ts += pd.Timedelta(days=2)
+        elif prediction_ts.weekday() == 6: prediction_ts += pd.Timedelta(days=1)
+
+    global_next_day_str = prediction_ts.strftime('%A, %b %d, %Y')
+    forecast_text = "current active AMO session" if forecast_type == "Current Day" else "next active AMO session"
+    st.markdown(f"<p style='color: #666; font-style: italic; margin-top: -10px;'>All model predictions are forecasting for the {forecast_text}: <b>{global_next_day_str}</b></p>", unsafe_allow_html=True)
     
     if st.session_state['watchlist']:
         excel_data = export_watchlist_to_excel(st.session_state['watchlist'])
