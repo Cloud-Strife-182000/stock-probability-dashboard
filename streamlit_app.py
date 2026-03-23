@@ -610,7 +610,9 @@ def render_main_dashboard(ticker_input, exchange, selected_features):
                         st.dataframe(display_df, use_container_width=True)
                     
                     with st.expander("🔍 View Today's Feature Snapshot (Prediction Input)", expanded=False):
-                        st.markdown("This is the **single feature row** the model used to generate today's forecast. All values are sourced from the most recent available session:")
+                        snapshot_date_str = df['DateStr'].iloc[-1]
+                        snapshot_day = pd.to_datetime(snapshot_date_str).strftime('%A, %d %b %Y')
+                        st.markdown(f"This is the **single feature row** the model used to generate today's forecast. All values are sourced from the most recent available session: **{snapshot_day}**")
                         if today_features is not None and not today_features.empty:
                             snapshot_df = today_features.copy()
                             snapshot_df.index = [st.session_state.get('last_ticker', symbol)]
