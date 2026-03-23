@@ -117,19 +117,27 @@ FEATURE_MAP = {
     "Nifty Trend": 'Nifty_Trend_Dist'
 }
 
-with st.expander("🛠️ Advanced Model Settings", expanded=False):
-    st.markdown("Select features to include in the Random Forest model training:")
-    cols = st.columns(3)
-    selected_features = []
-    
-    # Render checkboxes in a grid
-    for i, (label, col_name) in enumerate(FEATURE_MAP.items()):
-        if cols[i % 3].checkbox(label, value=True, key=f"feat_{col_name}"):
-            selected_features.append(col_name)
+# Reset features to ALL by default when ticker changes
+if ticker_input:
+    if 'last_ticker' not in st.session_state or st.session_state['last_ticker'] != ticker_input:
+        st.session_state['last_ticker'] = ticker_input
+        for col_name in FEATURE_MAP.values():
+            st.session_state[f"feat_{col_name}"] = True
 
-    if st.button("🚀 Re-Train Model", use_container_width=True):
-        st.toast("Re-training model with new feature set...", icon="🔄")
-        # Streamlit will rerun automatically on button click, using the new checkbox states
+with st.expander("🛠️ Advanced Model Settings", expanded=False):
+    with st.form("feature_selection_form"):
+        st.markdown("Select features to include in the Random Forest model training:")
+        cols = st.columns(3)
+        
+        # Render checkboxes in a grid
+        for i, (label, col_name) in enumerate(FEATURE_MAP.items()):
+            cols[i % 3].checkbox(label, key=f"feat_{col_name}")
+
+        if st.form_submit_button("🚀 Re-Train Model", use_container_width=True):
+            st.toast("Re-training model with new feature set...", icon="🔄")
+
+# Compute selected features based on session_state (guaranteed by form or search-reset)
+selected_features = [c for c in FEATURE_MAP.values() if st.session_state.get(f"feat_{c}", True)]
 
 def render_main_dashboard(ticker_input, exchange, selected_features):
     with st.spinner(f"Fetching data and calculating indicators for {ticker_input}..."):
