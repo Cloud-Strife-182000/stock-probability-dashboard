@@ -114,7 +114,8 @@ FEATURE_MAP = {
     "Frac Diff (Memory)": 'Frac_Diff_Close',
     "Nifty Momentum": 'Nifty_Momentum',
     "Nifty RSI": 'Nifty_RSI_14',
-    "Nifty Trend": 'Nifty_Trend_Dist'
+    "Nifty Trend": 'Nifty_Trend_Dist',
+    "Morning Autocorr": 'Morning_Autocorr'
 }
 
 # Initial setup for persistence of engine features
@@ -244,6 +245,12 @@ def render_main_dashboard(ticker_input, exchange, selected_features):
             
             # 3.55 DYNAMIC FEATURES
             df['Frac_Diff_Close'] = frac_diff_ffd(df['Close'], d=0.4)
+            
+            # 3.55 MORNING AUTOCORRELATION (10:15 AM Price vs Open)
+            df = df.sort_values(['DateStr', 'DatetimeObj'])
+            day_opens = df.groupby('DateStr')['Open'].transform('first')
+            p1015 = df[df['TimeStr'] == '10:15'].set_index('DateStr')['Close']
+            df['Morning_Autocorr'] = (df['DateStr'].map(p1015) - day_opens) / day_opens
             
             # 3.55 ORDER FLOW IMBALANCE
             hl_range = df['High'] - df['Low']
