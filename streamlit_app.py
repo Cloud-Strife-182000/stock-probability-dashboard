@@ -140,15 +140,11 @@ def render_main_dashboard(ticker_input, exchange):
                     
                 open_price = group.iloc[0]['Open']
                 close_price = group.iloc[1]['Close']
-                daily_atr = group.iloc[0]['Daily_ATR_14']
-                atr_hurdle = daily_atr * 0.15
                 
-                if close_price >= open_price + atr_hurdle:
+                if close_price > open_price:
                     daily_targets[date_str] = 1.0
-                elif close_price <= open_price - atr_hurdle:
-                    daily_targets[date_str] = -1.0
                 else:
-                    daily_targets[date_str] = 0.0
+                    daily_targets[date_str] = -1.0
             
             # 5. ML DATASET FILTRATION (Strictly Final Hourly Candles)
             ml_df = df.groupby('DateStr').tail(1).copy() # Changed filtration logic
@@ -177,7 +173,6 @@ def render_main_dashboard(ticker_input, exchange):
             prob_pct = 0.0
             prob_long = 0.0
             prob_short = 0.0
-            prob_avoid = 0.0
             test_accuracy = 0.0
             baseline_accuracy = 0.0
             true_edge = 0.0
@@ -202,10 +197,8 @@ def render_main_dashboard(ticker_input, exchange):
                 
                 if baseline_class_raw == 1.0:
                     baseline_label = "LONG"
-                elif baseline_class_raw == -1.0:
-                    baseline_label = "SHORT"
                 else:
-                    baseline_label = "AVOID"
+                    baseline_label = "SHORT"
                     
                 true_edge = test_accuracy - baseline_accuracy
                 
@@ -215,9 +208,7 @@ def render_main_dashboard(ticker_input, exchange):
                 
                 # 5-Day Walk-Forward Validation
                 def get_amo_val(val):
-                    if val == 1.0: return "LONG"
-                    elif val == -1.0: return "SHORT"
-                    return "AVOID"
+                    return "LONG" if val == 1.0 else "SHORT"
                     
                 lookback_days = min(5, len(X) - 2)
                 correct_count = 0
@@ -295,7 +286,6 @@ def render_main_dashboard(ticker_input, exchange):
                     try:
                         prob_long = prob_array[class_labels.index(1.0)] * 100 if 1.0 in class_labels else 0.0
                         prob_short = prob_array[class_labels.index(-1.0)] * 100 if -1.0 in class_labels else 0.0
-                        prob_avoid = prob_array[class_labels.index(0.0)] * 100 if 0.0 in class_labels else 0.0
                     except ValueError:
                         pass
                     
@@ -303,14 +293,10 @@ def render_main_dashboard(ticker_input, exchange):
                         ml_pred_label = "LONG AMO"
                         ml_color = "#00C073" # Green
                         ml_bg_color = "rgba(0, 192, 115, 0.05)"
-                    elif pred_class == -1.0:
+                    else:
                         ml_pred_label = "SHORT AMO"
                         ml_color = "#FF2B2B" # Red
                         ml_bg_color = "rgba(255, 43, 43, 0.05)"
-                    else:
-                        ml_pred_label = "AVOID"
-                        ml_color = "#D99300" # Yellow
-                        ml_bg_color = "rgba(217, 147, 0, 0.05)"
                         
                     prob_pct = max(prob_array) * 100
                     
@@ -393,7 +379,6 @@ def render_main_dashboard(ticker_input, exchange):
                     'prob': prob_pct, 
                     'prob_long': prob_long,
                     'prob_short': prob_short,
-                    'prob_avoid': prob_avoid,
                     'acc': test_accuracy * 100,
                     'baseline': baseline_accuracy * 100,
                     'baseline_label': baseline_label,
@@ -417,10 +402,6 @@ def render_main_dashboard(ticker_input, exchange):
                             <div style="background-color: rgba(255, 43, 43, 0.1); border: 1px solid #FF2B2B; padding: 10px 20px; border-radius: 8px;">
                                 <p style="margin: 0; font-size: 0.9rem; color: #555; text-transform: uppercase; font-weight: 600;">Short AMO</p>
                                 <h3 style="margin: 5px 0 0 0; color: #FF2B2B;">{prob_short:.1f}%</h3>
-                            </div>
-                            <div style="background-color: rgba(217, 147, 0, 0.1); border: 1px solid #D99300; padding: 10px 20px; border-radius: 8px;">
-                                <p style="margin: 0; font-size: 0.9rem; color: #555; text-transform: uppercase; font-weight: 600;">Avoid</p>
-                                <h3 style="margin: 5px 0 0 0; color: #D99300;">{prob_avoid:.1f}%</h3>
                             </div>
                         </div>
                         <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid rgba(0,0,0,0.05);">
@@ -521,13 +502,12 @@ with tab2:
             export_data.append({
                 "Ticker": ticker,
                 "Highest Prob (%)": round(info['prob'], 1),
-                "Prediction": info.get('label', 'AVOID'),
+                "Prediction": info.get('label', 'N/A'),
                 "Long AMO (%)": round(info.get('prob_long', 0.0), 1),
                 "Short AMO (%)": round(info.get('prob_short', 0.0), 1),
-                "Avoid (%)": round(info.get('prob_avoid', 0.0), 1),
                 "Model Accuracy (%)": round(info['acc'], 1),
                 "Baseline Accuracy (%)": round(info.get('baseline', 0.0), 1),
-                "Baseline Guess": info.get('baseline_label', 'AVOID'),
+                "Baseline Guess": info.get('baseline_label', 'N/A'),
                 "True Edge (%)": round(info.get('edge', 0.0), 1),
                 "Latest Result": info.get('latest_result', '').split('Recent Regime Sync: ')[1].split(' Correct')[0] if 'Recent Regime Sync:' in info.get('latest_result', '') else 'N/A'
             })
