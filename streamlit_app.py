@@ -208,6 +208,10 @@ def render_main_dashboard(ticker_input, exchange):
                     
                 true_edge = test_accuracy - baseline_accuracy
                 
+                today_ist_wf = pd.Timestamp.today(tz='Asia/Kolkata')
+                last_df_date_str_wf = df['DateStr'].iloc[-1]
+                is_current_day_live = (today_ist_wf.hour < 16 and last_df_date_str_wf == today_ist_wf.strftime('%Y-%m-%d'))
+                
                 # 5-Day Walk-Forward Validation
                 def get_amo_val(val):
                     if val == 1.0: return "LONG"
@@ -219,7 +223,11 @@ def render_main_dashboard(ticker_input, exchange):
                 eval_results = []
                 
                 if lookback_days > 0:
-                    for i in range(1, lookback_days + 1):
+                    start_idx = 2 if is_current_day_live else 1
+                    end_idx = lookback_days + start_idx
+                    max_available = len(X) - 1
+                    
+                    for i in range(start_idx, min(end_idx, max_available + 1)):
                         test_idx = -i
                         eval_wf_model = clone(base_ensemble)
                         
@@ -249,7 +257,8 @@ def render_main_dashboard(ticker_input, exchange):
                             
                     eval_results.reverse() # Show oldest to newest
                     
-                    latest_result_html = f"<div style='margin-bottom: 8px;'><b style='color: black;'>Recent Regime Sync: {correct_count}/{lookback_days} Correct</b></div>"
+                    val_count = len(eval_results)
+                    latest_result_html = f"<div style='margin-bottom: 8px;'><b style='color: black;'>Recent Regime Sync: {correct_count}/{val_count} Correct</b></div>"
                     latest_result_html += f"<ul style='list-style-type: none; padding-left: 0; margin: 0; font-size: 0.95rem;'>" + "".join(eval_results) + "</ul>"
                 else:
                     latest_result_html = "<span>Not enough data for 5-Day Validation.</span>"
