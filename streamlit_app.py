@@ -67,7 +67,32 @@ with col1:
 with col2:
     exchange = st.selectbox("Select Exchange:", ["NSE", "BSE"])
 
-def render_main_dashboard(ticker_input, exchange):
+# --- NEW: DYNAMIC FEATURE SELECTION UI ---
+FEATURE_MAP = {
+    "Closing Momentum": 'Closing_Momentum',
+    "Volume Surge": 'Closing_Volume_Surge',
+    "Dist to SMA5": 'Distance_to_Fast_SMA',
+    "ATR %": 'ATR_Percent',
+    "Daily RSI": 'Daily_RSI_14',
+    "VWAP Dist": 'VWAP_Distance',
+    "OFI (Order Flow)": 'OFI'
+}
+
+with st.expander("🛠️ Advanced Model Settings", expanded=False):
+    st.markdown("Select features to include in the Random Forest model training:")
+    cols = st.columns(3)
+    selected_features = []
+    
+    # Render checkboxes in a grid
+    for i, (label, col_name) in enumerate(FEATURE_MAP.items()):
+        if cols[i % 3].checkbox(label, value=True, key=f"feat_{col_name}"):
+            selected_features.append(col_name)
+
+    if st.button("🚀 Re-Train Model", use_container_width=True):
+        st.toast("Re-training model with new feature set...", icon="🔄")
+        # Streamlit will rerun automatically on button click, using the new checkbox states
+
+def render_main_dashboard(ticker_input, exchange, selected_features):
     with st.spinner(f"Fetching data and calculating indicators for {ticker_input}..."):
         try:
             data_1d, data_1h, symbol = fetch_stock_data(ticker_input, exchange) # Changed data_15m to data_1h
@@ -168,8 +193,8 @@ def render_main_dashboard(ticker_input, exchange):
                 
             ml_df['Target'] = ml_df.apply(map_target, axis=1)
             
-            # ML DropNA strictly applies to ALL 7 features plus the resulting prediction target
-            ml_df = ml_df.dropna(subset=['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'OFI', 'Target'])
+            # ML DropNA strictly applies to ALL selected features plus the resulting prediction target
+            ml_df = ml_df.dropna(subset=selected_features + ['Target'])
             
             bullish_prob = None
             ml_details = None
@@ -187,7 +212,7 @@ def render_main_dashboard(ticker_input, exchange):
             hist_short_pct = 0.0
             
             if len(ml_df) > 10:
-                X = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'OFI']].astype(float)
+                X = ml_df[selected_features].astype(float)
                 y = ml_df['Target']
                 
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
@@ -282,13 +307,13 @@ def render_main_dashboard(ticker_input, exchange):
                     
                     available_dates = list(df['DateStr'].unique())
                     feature_day_str = available_dates[-2] if len(available_dates) > 1 else available_dates[-1]
-                    today_features = df[df['DateStr'] == feature_day_str].tail(1)[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'OFI']].astype(float)
+                    today_features = df[df['DateStr'] == feature_day_str].tail(1)[selected_features].astype(float)
                     st.session_state['forecast_type'] = "Current Day"
                 else:
                     # Market is closed (>= 4PM). Predict for TOMORROW using TODAY's data.
                     model.fit(X, y)
                     
-                    today_features = df.groupby('DateStr').tail(1).iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'OFI']].to_frame().T.astype(float)
+                    today_features = df.groupby('DateStr').tail(1).iloc[-1][selected_features].to_frame().T.astype(float)
                     st.session_state['forecast_type'] = "Next Day"
 
                 if not today_features.isna().any().any():
@@ -313,21 +338,17 @@ def render_main_dashboard(ticker_input, exchange):
                         
                     prob_pct = max(prob_array) * 100
                     
+                    # Dynamic Importance Mapping
+                    rev_map = {v: k for k, v in FEATURE_MAP.items()}
+                    importances_dict = {rev_map[f]: model.feature_importances_[i] for i, f in enumerate(selected_features)}
+                    
                     ml_details = {
                         "accuracy": test_accuracy,
                         "baseline": baseline_accuracy,
                         "true_edge": true_edge,
                         "baseline_label": baseline_label,
                         "samples": len(ml_df),
-                        "importances": {
-                            "Momentum": model.feature_importances_[0],
-                            "Vol Surge": model.feature_importances_[1],
-                            "Dist to SMA5": model.feature_importances_[2],
-                            "ATR %": model.feature_importances_[3],
-                            "Daily RSI": model.feature_importances_[4],
-                            "VWAP Dist": model.feature_importances_[5],
-                            "OFI": model.feature_importances_[6]
-                        }
+                        "importances": importances_dict
                     }
             
             # 6. UI CONSTRUCTION LAYER
@@ -476,13 +497,13 @@ def render_main_dashboard(ticker_input, exchange):
                         st.bar_chart(fi_df, height=200)
                         
                         st.markdown("**AMO Feature Correlation Matrix:**")
-                        ml_features = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'OFI', 'Target']]
+                        ml_features = ml_df[selected_features + ['Target']]
                         styled_corr = ml_features.corr().style.background_gradient(cmap="Oranges").format("{:.2f}")
                         st.dataframe(styled_corr, use_container_width=True)
                         
                     with st.expander("View Raw Hourly Machine Learning Training Data", expanded=False):
                         st.markdown("This targeted intraday matrix maps exclusively the final hourly closing datasets evaluated natively across 730 days exactly against the sustained 10:15 AM close target thresholds:")
-                        display_df = ml_df.copy()
+                        display_df = ml_df[selected_features + ['Target']].copy()
                         display_df = display_df.set_index('DateStr')
                         st.dataframe(display_df, use_container_width=True)
                         
@@ -511,7 +532,10 @@ tab1, tab2 = st.tabs(["📊 Main Dashboard", "⭐ Watchlist"])
 
 if ticker_input:
     with tab1:
-        render_main_dashboard(ticker_input, exchange)
+        if not selected_features:
+            st.warning("⚠️ Please select at least one feature in 'Advanced Model Settings' to train the model.")
+        else:
+            render_main_dashboard(ticker_input, exchange, selected_features)
 
 with tab2:
     col_w1, col_w2 = st.columns([3, 1])
