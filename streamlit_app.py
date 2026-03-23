@@ -57,6 +57,22 @@ def get_top_news(ticker):
     except Exception as e:
         return []
 
+def frac_diff_ffd(series, d=0.4, thresh=1e-5):
+    """Fixed-Width Window Fractional Differencing (Lopez de Prado)."""
+    w = [1.0]
+    k = 1
+    while abs(w[-1]) > thresh:
+        w.append(-w[-1] * (d - k + 1) / k)
+        k += 1
+    w = np.array(w[::-1])
+    width = len(w)
+    output = []
+    vals = series.values
+    for i in range(width - 1, len(vals)):
+        output.append(np.dot(w, vals[i - width + 1:i + 1]))
+    result = pd.Series([np.nan] * (width - 1) + output, index=series.index)
+    return result
+
 
 
 st.title("Stock Probability Dashboard")
@@ -75,7 +91,8 @@ FEATURE_MAP = {
     "ATR %": 'ATR_Percent',
     "Daily RSI": 'Daily_RSI_14',
     "VWAP Dist": 'VWAP_Distance',
-    "OFI (Order Flow)": 'OFI'
+    "OFI (Order Flow)": 'OFI',
+    "Frac Diff (Memory)": 'Frac_Diff_Close'
 }
 
 with st.expander("🛠️ Advanced Model Settings", expanded=False):
@@ -156,6 +173,9 @@ def render_main_dashboard(ticker_input, exchange, selected_features):
             df['Cum_TP_Vol'] = df.groupby('DateStr')['TP_Volume'].cumsum()
             df['VWAP'] = df['Cum_TP_Vol'] / df['Cum_Vol']
             df['VWAP_Distance'] = (df['Close'] - df['VWAP']) / df['VWAP']
+            
+            # 3.55 DYNAMIC FEATURES
+            df['Frac_Diff_Close'] = frac_diff_ffd(df['Close'], d=0.4)
             
             # 3.55 ORDER FLOW IMBALANCE
             hl_range = df['High'] - df['Low']
