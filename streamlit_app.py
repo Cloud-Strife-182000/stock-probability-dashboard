@@ -510,7 +510,8 @@ def render_main_dashboard(ticker_input, exchange, selected_features):
                     'label': ml_pred_label,
                     'color': ml_color,
                     'bg_color': ml_bg_color,
-                    'latest_result': latest_result_html
+                    'latest_result': latest_result_html,
+                    'selected_features': ", ".join([{v: k for k, v in FEATURE_MAP.items()}.get(f, f) for f in selected_features])
                 }
                 
                 st.markdown(
@@ -654,6 +655,7 @@ with tab2:
                 "Baseline Accuracy (%)": round(info.get('baseline', 0.0), 1),
                 "Baseline Guess": info.get('baseline_label', 'N/A'),
                 "True Edge (%)": round(info.get('edge', 0.0), 1),
+                "Features Used": info.get('selected_features', 'N/A'),
                 "Latest Result": info.get('latest_result', '').split('Recent Regime Sync: ')[1].split(' Correct')[0] if 'Recent Regime Sync:' in info.get('latest_result', '') else 'N/A'
             })
             color_map[ticker] = info.get('color', '#D99300')
@@ -731,6 +733,9 @@ with tab2:
                 <div style="margin-top: 5px; margin-bottom: 20px; text-align: center;">
                     <p style="margin: 0; font-size: 0.85rem; color: #555; text-transform: uppercase; font-weight: 600; margin-bottom: 10px;">5-Day Walk-Forward Validation</p>
                     <div style="text-align: left; padding: 8px; border-radius: 6px; border: 1px solid #DDD; display: inline-block;">{w_data.get('latest_result', 'N/A')}</div>
+                </div>
+                <div style="margin-bottom: 15px; padding: 8px; background: rgba(0,0,0,0.02); border-radius: 4px; border-left: 3px solid {color};">
+                    <p style="margin: 0; font-size: 0.75rem; color: #666; line-height: 1.4;"><b>Features:</b> {w_data.get('selected_features', 'N/A')}</p>
                 </div>
                 <div style="display: flex; justify-content: space-between; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 15px;">
                     <div style="flex: 1; text-align: center; border-right: 1px solid rgba(0,0,0,0.05);">
