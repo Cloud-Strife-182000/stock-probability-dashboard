@@ -38,6 +38,25 @@ def fetch_stock_data(ticker, exch):
     
     return df_1d, df, sym
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_nifty_data():
+    """Fetch NIFTY 50 (^NSEI) daily data for macro context."""
+    try:
+        nifty = yf.Ticker("^NSEI")
+        df_nifty = nifty.history(period="2y", interval="1d")
+        if df_nifty.empty:
+            return pd.DataFrame()
+        df_nifty = df_nifty.reset_index()
+        df_nifty['DateStr'] = pd.to_datetime(df_nifty['Date']).dt.strftime('%Y-%m-%d')
+        # Macro Indicators
+        df_nifty['Nifty_Momentum'] = (df_nifty['Close'] - df_nifty['Open']) / df_nifty['Open']
+        df_nifty['Nifty_RSI_14'] = df_nifty.ta.rsi(length=14)
+        ema20 = df_nifty['Close'].ewm(span=20, adjust=False).mean()
+        df_nifty['Nifty_Trend_Dist'] = (df_nifty['Close'] - ema20) / ema20
+        return df_nifty[['DateStr', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']]
+    except Exception:
+        return pd.DataFrame()
+
 @st.cache_data(ttl=1800, show_spinner=False)
 def get_top_news(ticker):
     url = f"https://news.google.com/rss/search?q={ticker}+share+news&hl=en-IN&gl=IN&ceid=IN:en"
@@ -92,7 +111,10 @@ FEATURE_MAP = {
     "Daily RSI": 'Daily_RSI_14',
     "VWAP Dist": 'VWAP_Distance',
     "OFI (Order Flow)": 'OFI',
-    "Frac Diff (Memory)": 'Frac_Diff_Close'
+    "Frac Diff (Memory)": 'Frac_Diff_Close',
+    "Nifty Momentum": 'Nifty_Momentum',
+    "Nifty RSI": 'Nifty_RSI_14',
+    "Nifty Trend": 'Nifty_Trend_Dist'
 }
 
 with st.expander("🛠️ Advanced Model Settings", expanded=False):
@@ -135,6 +157,15 @@ def render_main_dashboard(ticker_input, exchange, selected_features):
                 df_1d['Daily_ATR_14'] = df_1d.ta.atr(length=14)
                 df_1d['Daily_RSI_14'] = df_1d.ta.rsi(length=14)
                 
+            # 1.5 MERGE NIFTY MACO DATA
+            nifty_df = fetch_nifty_data()
+            if not nifty_df.empty:
+                df_1d = pd.merge(df_1d, nifty_df, on='DateStr', how='left')
+                # Forward fill nifty data in case of slight timestamp mismatches
+                for col in ['Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']:
+                    if col in df_1d.columns:
+                        df_1d[col] = df_1d[col].ffill()
+                
             # 2. PROCESS 1h DATA
             df = data_1h.copy() # Changed data_15m to data_1h
             if isinstance(df.columns, pd.MultiIndex):
@@ -157,11 +188,16 @@ def render_main_dashboard(ticker_input, exchange, selected_features):
             df['Closing_Volume_Surge'] = df['Volume'] / df['Volume'].rolling(window=35).mean() # Changed window to 35
             
             # 3. MERGE DAILY DATA
-            daily_subset = df_1d[['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14']].dropna()
+            # 3. MERGE DAILY DATA (Stock + NIFTY Macro)
+            daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']
+            merge_cols = [c for c in daily_cols if c in df_1d.columns]
+            daily_subset = df_1d[merge_cols].dropna()
             df = pd.merge(df, daily_subset, on='DateStr', how='left')
-            df['Daily_SMA_5'] = df['Daily_SMA_5'].ffill()
-            df['Daily_ATR_14'] = df['Daily_ATR_14'].ffill()
-            df['Daily_RSI_14'] = df['Daily_RSI_14'].ffill()
+            
+            # Forward fill all merged daily indicators to ensure 1h rows have macro context
+            for col in merge_cols:
+                if col != 'DateStr':
+                    df[col] = df[col].ffill()
             
             df['Distance_to_Fast_SMA'] = (df['Close'] - df['Daily_SMA_5']) / df['Daily_SMA_5']
             df['ATR_Percent'] = df['Daily_ATR_14'] / df['Close']
