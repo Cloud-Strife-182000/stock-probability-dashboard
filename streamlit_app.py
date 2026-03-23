@@ -117,14 +117,19 @@ FEATURE_MAP = {
     "Nifty Trend": 'Nifty_Trend_Dist'
 }
 
-# Reset features to ALL by default when ticker changes
-if ticker_input:
-    if 'last_ticker' not in st.session_state or st.session_state['last_ticker'] != ticker_input:
-        st.session_state['last_ticker'] = ticker_input
-        for col_name in FEATURE_MAP.values():
-            st.session_state[f"feat_{col_name}"] = True
+# Initial setup for all features selected by default on very first session load
+for col_name in FEATURE_MAP.values():
+    key = f"feat_{col_name}"
+    if key not in st.session_state:
+        st.session_state[key] = True
 
 with st.expander("🛠️ Advanced Model Settings", expanded=False):
+    # Select All Utility
+    if st.button("✅ Select All Features", help="Quickly check all features below", use_container_width=True):
+        for col_name in FEATURE_MAP.values():
+            st.session_state[f"feat_{col_name}"] = True
+        st.rerun()
+
     with st.form("feature_selection_form"):
         st.markdown("Select features to include in the Random Forest model training:")
         cols = st.columns(3)
