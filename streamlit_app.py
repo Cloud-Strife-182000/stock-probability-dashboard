@@ -130,8 +130,6 @@ def render_main_dashboard(ticker_input, exchange):
             df['ATR_Percent'] = df['Daily_ATR_14'] / df['Close']
             
             # 3.5 ADVANCED INTRADAY FEATURES
-            df['Day_of_Week'] = df['DatetimeObj'].dt.dayofweek
-            
             df['Typical_Price'] = (df['High'] + df['Low'] + df['Close']) / 3
             df['TP_Volume'] = df['Typical_Price'] * df['Volume']
             df['Cum_Vol'] = df.groupby('DateStr')['Volume'].cumsum()
@@ -148,14 +146,13 @@ def render_main_dashboard(ticker_input, exchange):
             nifty_daily['DateStr'] = pd.to_datetime(nifty_daily[nifty_dt_col]).dt.strftime('%Y-%m-%d')
             
             nifty_daily['Nifty_Momentum'] = (nifty_daily['Close'] - nifty_daily['Open']) / nifty_daily['Open']
-            nifty_daily['Nifty_SMA_5'] = nifty_daily['Close'].rolling(window=5).mean()
-            nifty_daily['Nifty_Distance_SMA5'] = (nifty_daily['Close'] - nifty_daily['Nifty_SMA_5']) / nifty_daily['Nifty_SMA_5']
+            nifty_daily['Nifty_Prev_Day_Return'] = nifty_daily['Close'].pct_change()
             nifty_daily['Nifty_RSI_14'] = nifty_daily.ta.rsi(length=14)
             
-            nifty_subset = nifty_daily[['DateStr', 'Nifty_Momentum', 'Nifty_Distance_SMA5', 'Nifty_RSI_14']].dropna()
+            nifty_subset = nifty_daily[['DateStr', 'Nifty_Momentum', 'Nifty_Prev_Day_Return', 'Nifty_RSI_14']].dropna()
             df = pd.merge(df, nifty_subset, on='DateStr', how='left')
             df['Nifty_Momentum'] = df['Nifty_Momentum'].ffill()
-            df['Nifty_Distance_SMA5'] = df['Nifty_Distance_SMA5'].ffill()
+            df['Nifty_Prev_Day_Return'] = df['Nifty_Prev_Day_Return'].ffill()
             df['Nifty_RSI_14'] = df['Nifty_RSI_14'].ffill()
             
             # 4. ENGINEER AMO TARGET (Positionally Anchored Sustained Trend)
@@ -189,8 +186,8 @@ def render_main_dashboard(ticker_input, exchange):
                 
             ml_df['Target'] = ml_df.apply(map_target, axis=1)
             
-            # ML DropNA strictly applies to ALL 10 features plus the resulting prediction target
-            ml_df = ml_df.dropna(subset=['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'Day_of_Week', 'Nifty_Momentum', 'Nifty_Distance_SMA5', 'Nifty_RSI_14', 'Target'])
+            # ML DropNA strictly applies to ALL 9 features plus the resulting prediction target
+            ml_df = ml_df.dropna(subset=['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'Nifty_Momentum', 'Nifty_Prev_Day_Return', 'Nifty_RSI_14', 'Target'])
             
             bullish_prob = None
             ml_details = None
@@ -206,7 +203,7 @@ def render_main_dashboard(ticker_input, exchange):
             latest_result_html = ""
             
             if len(ml_df) > 10:
-                X = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'Day_of_Week', 'Nifty_Momentum', 'Nifty_Distance_SMA5', 'Nifty_RSI_14']].astype(float)
+                X = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'Nifty_Momentum', 'Nifty_Prev_Day_Return', 'Nifty_RSI_14']].astype(float)
                 y = ml_df['Target']
                 
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
@@ -296,13 +293,13 @@ def render_main_dashboard(ticker_input, exchange):
                     
                     available_dates = list(df['DateStr'].unique())
                     feature_day_str = available_dates[-2] if len(available_dates) > 1 else available_dates[-1]
-                    today_features = df[df['DateStr'] == feature_day_str].tail(1)[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'Day_of_Week', 'Nifty_Momentum', 'Nifty_Distance_SMA5', 'Nifty_RSI_14']].astype(float)
+                    today_features = df[df['DateStr'] == feature_day_str].tail(1)[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'Nifty_Momentum', 'Nifty_Prev_Day_Return', 'Nifty_RSI_14']].astype(float)
                     st.session_state['forecast_type'] = "Current Day"
                 else:
                     # Market is closed (>= 4PM). Predict for TOMORROW using TODAY's data.
                     model.fit(X, y)
                     
-                    today_features = df.groupby('DateStr').tail(1).iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'Day_of_Week', 'Nifty_Momentum', 'Nifty_Distance_SMA5', 'Nifty_RSI_14']].to_frame().T.astype(float)
+                    today_features = df.groupby('DateStr').tail(1).iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'Nifty_Momentum', 'Nifty_Prev_Day_Return', 'Nifty_RSI_14']].to_frame().T.astype(float)
                     st.session_state['forecast_type'] = "Next Day"
 
                 if not today_features.isna().any().any():
@@ -340,10 +337,9 @@ def render_main_dashboard(ticker_input, exchange):
                             "ATR %": model.feature_importances_[3],
                             "Daily RSI": model.feature_importances_[4],
                             "VWAP Dist": model.feature_importances_[5],
-                            "Day of Week": model.feature_importances_[6],
-                            "Nifty Mom": model.feature_importances_[7],
-                            "Nifty SMA5": model.feature_importances_[8],
-                            "Nifty RSI": model.feature_importances_[9]
+                            "Nifty Mom": model.feature_importances_[6],
+                            "Nifty Prev": model.feature_importances_[7],
+                            "Nifty RSI": model.feature_importances_[8]
                         }
                     }
             
@@ -481,7 +477,7 @@ def render_main_dashboard(ticker_input, exchange):
                         st.bar_chart(fi_df, height=200)
                         
                         st.markdown("**AMO Feature Correlation Matrix:**")
-                        ml_features = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'Day_of_Week', 'Nifty_Momentum', 'Nifty_Distance_SMA5', 'Nifty_RSI_14', 'Target']]
+                        ml_features = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'Nifty_Momentum', 'Nifty_Prev_Day_Return', 'Nifty_RSI_14', 'Target']]
                         styled_corr = ml_features.corr().style.background_gradient(cmap="Oranges").format("{:.2f}")
                         st.dataframe(styled_corr, use_container_width=True)
                         
