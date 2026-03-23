@@ -117,32 +117,51 @@ FEATURE_MAP = {
     "Nifty Trend": 'Nifty_Trend_Dist'
 }
 
-# Initial setup for all features selected by default on very first session load
+# Initial setup for persistence of engine features
+if 'confirmed_features' not in st.session_state:
+    st.session_state['confirmed_features'] = list(FEATURE_MAP.values())
+
 for col_name in FEATURE_MAP.values():
     key = f"feat_{col_name}"
     if key not in st.session_state:
         st.session_state[key] = True
 
+# Detect ticker change to sync engine to current UI selection
+if ticker_input:
+    if 'last_ticker' not in st.session_state or st.session_state['last_ticker'] != ticker_input:
+        st.session_state['last_ticker'] = ticker_input
+        # Committing CURRENT UI state to ENGINE state for the new search
+        st.session_state['confirmed_features'] = [c for c in FEATURE_MAP.values() if st.session_state.get(f"feat_{c}", True)]
+        st.session_state['skip_render'] = False
+
 with st.expander("🛠️ Advanced Model Settings", expanded=False):
-    # Select All Utility
-    if st.button("✅ Select All Features", help="Quickly check all features below", use_container_width=True):
+    c1, c2 = st.columns(2)
+    # Select/Deselect Utilities
+    if c1.button("✅ Select All Features", use_container_width=True):
         for col_name in FEATURE_MAP.values():
             st.session_state[f"feat_{col_name}"] = True
+        st.session_state['skip_render'] = True
+        st.rerun()
+    
+    if c2.button("❌ Deselect All Features", use_container_width=True):
+        for col_name in FEATURE_MAP.values():
+            st.session_state[f"feat_{col_name}"] = False
+        st.session_state['skip_render'] = True
         st.rerun()
 
     with st.form("feature_selection_form"):
         st.markdown("Select features to include in the Random Forest model training:")
         cols = st.columns(3)
-        
-        # Render checkboxes in a grid
         for i, (label, col_name) in enumerate(FEATURE_MAP.items()):
             cols[i % 3].checkbox(label, key=f"feat_{col_name}")
 
         if st.form_submit_button("🚀 Re-Train Model", use_container_width=True):
+            st.session_state['confirmed_features'] = [c for c in FEATURE_MAP.values() if st.session_state.get(f"feat_{c}", True)]
+            st.session_state['skip_render'] = False
             st.toast("Re-training model with new feature set...", icon="🔄")
 
-# Compute selected features based on session_state (guaranteed by form or search-reset)
-selected_features = [c for c in FEATURE_MAP.values() if st.session_state.get(f"feat_{c}", True)]
+# The model ALWAYS uses the 'confirmed' set for calculation
+selected_features = st.session_state['confirmed_features']
 
 def render_main_dashboard(ticker_input, exchange, selected_features):
     with st.spinner(f"Fetching data and calculating indicators for {ticker_input}..."):
@@ -603,8 +622,14 @@ if ticker_input:
     with tab1:
         if not selected_features:
             st.warning("⚠️ Please select at least one feature in 'Advanced Model Settings' to train the model.")
+        elif st.session_state.get('skip_render', False):
+            # Show a helpful reminder that calculation hasn't run yet if skip_render is true
+            st.info("💡 Selection updated. Dashboard will refresh automatically on your next re-train or search.")
         else:
             render_main_dashboard(ticker_input, exchange, selected_features)
+
+# Reset skip_render flag for future interactions
+st.session_state['skip_render'] = False
 
 with tab2:
     col_w1, col_w2 = st.columns([3, 1])
