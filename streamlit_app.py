@@ -531,6 +531,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features):
                     f"""
                     <div style="text-align: center; padding: 2.5rem; border-radius: 12px; background-color: {ml_bg_color}; border: 2px solid {ml_color}; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 2rem; margin-bottom: 1rem;">
                         <h4 style="margin-bottom: 0px; margin-top: 0px; color: black; font-weight: 600;">{forecast_title}</h4>
+                        <p style="margin: 4px 0 0 0; font-size: 0.8rem; color: #888;">Predicting the 10:15 AM hourly candle direction — outcome resolves at ~11:15 AM opening</p>
                         <h1 style="color: {ml_color}; font-size: 3.5rem; margin: 10px 0px;">{prob_pct:.1f}% <span style="font-size: 1.8rem; font-weight: 400;">({ml_pred_label})</span></h1>
                         <div style="display: flex; justify-content: center; gap: 20px; margin-top: 20px;">
                             <div style="background-color: rgba(0, 192, 115, 0.1); border: 1px solid #00C073; padding: 10px 20px; border-radius: 8px;">
