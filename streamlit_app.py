@@ -589,7 +589,6 @@ with tab2:
             
             p_long = w_data.get('prob_long', 0.0)
             p_short = w_data.get('prob_short', 0.0)
-            p_avoid = w_data.get('prob_avoid', 0.0)
             
             st.markdown(f"""
             <div style="padding: 1.2rem; border-radius: 10px; background-color: {bg_color}; border: 1px solid {color}; margin-bottom: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
@@ -605,7 +604,7 @@ with tab2:
                         <p style="margin: 0; font-size: 0.85rem; color: #555; font-weight: 600; text-transform: uppercase;">AMO Model Accuracy</p>
                         <h3 style="margin: 5px 0 0 0; color: black; font-size: 1.4rem;">{w_data['acc']:.1f}%</h3>
                         <div style="margin-top: 5px;">
-                            <span style="font-size: 0.8rem; color: #777;">Base: {w_data.get('baseline', 0.0):.1f}% ({w_data.get('baseline_label', 'AVOID')})</span> | 
+                            <span style="font-size: 0.8rem; color: #777;">Base: {w_data.get('baseline', 0.0):.1f}% ({w_data.get('baseline_label', 'N/A')})</span> | 
                             <span style="font-size: 0.8rem; color: {'#00C073' if w_data.get('edge', 0.0) > 0 else '#FF2B2B'}; font-weight: bold;">Edge: {w_data.get('edge', 0.0):+.1f}%</span>
                         </div>
                     </div>
@@ -619,13 +618,9 @@ with tab2:
                         <p style="margin: 0; font-size: 0.75rem; color: #777; text-transform: uppercase;">Long AMO</p>
                         <h4 style="margin: 5px 0 0 0; color: #00C073; font-size: 1.1rem;">{p_long:.1f}%</h4>
                     </div>
-                    <div style="flex: 1; text-align: center; border-right: 1px solid rgba(0,0,0,0.05);">
+                    <div style="flex: 1; text-align: center;">
                         <p style="margin: 0; font-size: 0.75rem; color: #777; text-transform: uppercase;">Short AMO</p>
                         <h4 style="margin: 5px 0 0 0; color: #FF2B2B; font-size: 1.1rem;">{p_short:.1f}%</h4>
-                    </div>
-                    <div style="flex: 1; text-align: center;">
-                        <p style="margin: 0; font-size: 0.75rem; color: #777; text-transform: uppercase;">Avoid</p>
-                        <h4 style="margin: 5px 0 0 0; color: #D99300; font-size: 1.1rem;">{p_avoid:.1f}%</h4>
                     </div>
                 </div>
             </div>
