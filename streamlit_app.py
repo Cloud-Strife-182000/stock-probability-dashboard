@@ -57,6 +57,22 @@ def get_top_news(ticker):
     except Exception as e:
         return []
 
+def frac_diff_ffd(series, d=0.4, thresh=1e-5):
+    """Fixed-Width Window Fractional Differencing (Lopez de Prado)."""
+    w = [1.0]
+    k = 1
+    while abs(w[-1]) > thresh:
+        w.append(-w[-1] * (d - k + 1) / k)
+        k += 1
+    w = np.array(w[::-1])
+    width = len(w)
+    output = []
+    vals = series.values
+    for i in range(width - 1, len(vals)):
+        output.append(np.dot(w, vals[i - width + 1:i + 1]))
+    result = pd.Series([np.nan] * (width - 1) + output, index=series.index)
+    return result
+
 
 st.title("Stock Probability Dashboard")
 
@@ -131,6 +147,9 @@ def render_main_dashboard(ticker_input, exchange):
             df['VWAP'] = df['Cum_TP_Vol'] / df['Cum_Vol']
             df['VWAP_Distance'] = (df['Close'] - df['VWAP']) / df['VWAP']
             
+            # 3.55 FRACTIONAL DIFFERENCING
+            df['Frac_Diff_Close'] = frac_diff_ffd(df['Close'], d=0.4)
+            
             # 4. ENGINEER AMO TARGET (Positionally Anchored Sustained Trend)
             daily_targets = {}
             for date_str, group in df.groupby('DateStr'):
@@ -162,8 +181,8 @@ def render_main_dashboard(ticker_input, exchange):
                 
             ml_df['Target'] = ml_df.apply(map_target, axis=1)
             
-            # ML DropNA strictly applies to ALL 6 features plus the resulting prediction target
-            ml_df = ml_df.dropna(subset=['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'Target'])
+            # ML DropNA strictly applies to ALL 7 features plus the resulting prediction target
+            ml_df = ml_df.dropna(subset=['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'Frac_Diff_Close', 'Target'])
             
             bullish_prob = None
             ml_details = None
@@ -181,7 +200,7 @@ def render_main_dashboard(ticker_input, exchange):
             hist_short_pct = 0.0
             
             if len(ml_df) > 10:
-                X = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance']].astype(float)
+                X = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'Frac_Diff_Close']].astype(float)
                 y = ml_df['Target']
                 
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
@@ -276,13 +295,13 @@ def render_main_dashboard(ticker_input, exchange):
                     
                     available_dates = list(df['DateStr'].unique())
                     feature_day_str = available_dates[-2] if len(available_dates) > 1 else available_dates[-1]
-                    today_features = df[df['DateStr'] == feature_day_str].tail(1)[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance']].astype(float)
+                    today_features = df[df['DateStr'] == feature_day_str].tail(1)[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'Frac_Diff_Close']].astype(float)
                     st.session_state['forecast_type'] = "Current Day"
                 else:
                     # Market is closed (>= 4PM). Predict for TOMORROW using TODAY's data.
                     model.fit(X, y)
                     
-                    today_features = df.groupby('DateStr').tail(1).iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance']].to_frame().T.astype(float)
+                    today_features = df.groupby('DateStr').tail(1).iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'Frac_Diff_Close']].to_frame().T.astype(float)
                     st.session_state['forecast_type'] = "Next Day"
 
                 if not today_features.isna().any().any():
@@ -319,7 +338,8 @@ def render_main_dashboard(ticker_input, exchange):
                             "Dist to SMA5": model.feature_importances_[2],
                             "ATR %": model.feature_importances_[3],
                             "Daily RSI": model.feature_importances_[4],
-                            "VWAP Dist": model.feature_importances_[5]
+                            "VWAP Dist": model.feature_importances_[5],
+                            "Frac Diff": model.feature_importances_[6]
                         }
                     }
             
@@ -469,7 +489,7 @@ def render_main_dashboard(ticker_input, exchange):
                         st.bar_chart(fi_df, height=200)
                         
                         st.markdown("**AMO Feature Correlation Matrix:**")
-                        ml_features = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'Target']]
+                        ml_features = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'Frac_Diff_Close', 'Target']]
                         styled_corr = ml_features.corr().style.background_gradient(cmap="Oranges").format("{:.2f}")
                         st.dataframe(styled_corr, use_container_width=True)
                         
