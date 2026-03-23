@@ -261,11 +261,17 @@ def render_main_dashboard(ticker_input, exchange, selected_features):
             daily_targets = {}
             for date_str, group in df.groupby('DateStr'):
                 group = group.sort_values(by='DatetimeObj')
-                if len(group) < 2:
-                    continue # Skip days without enough hourly candles
+                
+                # Explicitly look up the 9:15 AM candle (market open) and 10:15 AM candle
+                # to avoid misalignment caused by missing candles (circuit limits, API drops).
+                candle_915 = group[group['TimeStr'] == '09:15']
+                candle_1015 = group[group['TimeStr'] == '10:15']
+                
+                if candle_915.empty or candle_1015.empty:
+                    continue  # Skip days where either key candle is missing
                     
-                open_price = group.iloc[0]['Open']
-                close_price = group.iloc[1]['Close']
+                open_price = candle_915.iloc[0]['Open']
+                close_price = candle_1015.iloc[0]['Close']
                 
                 if close_price > open_price:
                     daily_targets[date_str] = 1.0
