@@ -10,12 +10,8 @@ import xml.etree.ElementTree as ET
 import io
 import datetime
 
-from sklearn.ensemble import RandomForestClassifier, VotingClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from xgboost import XGBClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.pipeline import Pipeline
 from sklearn.base import clone
 
 st.set_page_config(page_title="Stock Probability Dashboard", layout="wide")
@@ -179,15 +175,9 @@ def render_main_dashboard(ticker_input, exchange):
                 X = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14']].astype(float)
                 y = ml_df['Target']
                 
-                le = LabelEncoder()
-                y_encoded = le.fit_transform(y)
+                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
                 
-                X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, shuffle=False)
-                
-                rf_model = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_leaf=15, class_weight='balanced', random_state=42)
-                xgb_model = XGBClassifier(n_estimators=100, max_depth=3, learning_rate=0.05, random_state=42, eval_metric='mlogloss', n_jobs=1)
-                lr_model = Pipeline([('scaler', StandardScaler()), ('lr', LogisticRegression(max_iter=1000, class_weight='balanced', random_state=42))])
-                base_ensemble = VotingClassifier(estimators=[('rf', rf_model), ('xgb', xgb_model), ('lr', lr_model)], voting='soft')
+                base_ensemble = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_leaf=15, class_weight='balanced', random_state=42)
                 
                 eval_model = clone(base_ensemble)
                 eval_model.fit(X_train, y_train)
@@ -196,8 +186,7 @@ def render_main_dashboard(ticker_input, exchange):
                 y_test_series = pd.Series(y_test)
                 baseline_accuracy = y_test_series.value_counts(normalize=True).max()
                 
-                baseline_class_encoded = y_test_series.value_counts(normalize=True).idxmax()
-                baseline_class_raw = le.inverse_transform([baseline_class_encoded])[0]
+                baseline_class_raw = y_test_series.value_counts(normalize=True).idxmax()
                 
                 if baseline_class_raw == 1.0:
                     baseline_label = "LONG"
@@ -231,14 +220,13 @@ def render_main_dashboard(ticker_input, exchange):
                         test_idx = -i
                         eval_wf_model = clone(base_ensemble)
                         
-                        eval_wf_model.fit(X.iloc[:test_idx], y_encoded[:test_idx])
+                        eval_wf_model.fit(X.iloc[:test_idx], y.iloc[:test_idx])
                             
                         # Process single validation day
                         test_X = X.iloc[[test_idx]]
                         actual_y = y.iloc[test_idx]
                         
-                        pred_encoded = eval_wf_model.predict(test_X)[0]
-                        pred_y = le.inverse_transform([pred_encoded])[0]
+                        pred_y = eval_wf_model.predict(test_X)[0]
                         
                         is_correct = (pred_y == actual_y)
                         if is_correct:
@@ -274,7 +262,7 @@ def render_main_dashboard(ticker_input, exchange):
                     # CRITICAL: Since today's 10:15 close exists in the dataset, yesterday's row in X 
                     # now contains today's true target. To prevent data leakage, we must exclude the 
                     # final row of X from the training set when generating the 'Current Day' prediction!
-                    model.fit(X.iloc[:-1], y_encoded[:-1])
+                    model.fit(X.iloc[:-1], y.iloc[:-1])
                     
                     available_dates = list(df['DateStr'].unique())
                     feature_day_str = available_dates[-2] if len(available_dates) > 1 else available_dates[-1]
@@ -282,17 +270,16 @@ def render_main_dashboard(ticker_input, exchange):
                     st.session_state['forecast_type'] = "Current Day"
                 else:
                     # Market is closed (>= 4PM). Predict for TOMORROW using TODAY's data.
-                    model.fit(X, y_encoded)
+                    model.fit(X, y)
                     
                     today_features = df.groupby('DateStr').tail(1).iloc[-1][['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14']].to_frame().T.astype(float)
                     st.session_state['forecast_type'] = "Next Day"
 
                 if not today_features.isna().any().any():
                     prob_array = model.predict_proba(today_features)[0]
-                    pred_class_encoded = model.predict(today_features)[0]
-                    pred_class = le.inverse_transform([pred_class_encoded])[0]
+                    pred_class = model.predict(today_features)[0]
                     
-                    class_labels = list(le.inverse_transform(model.classes_))
+                    class_labels = list(model.classes_)
                     try:
                         prob_long = prob_array[class_labels.index(1.0)] * 100 if 1.0 in class_labels else 0.0
                         prob_short = prob_array[class_labels.index(-1.0)] * 100 if -1.0 in class_labels else 0.0
@@ -315,7 +302,6 @@ def render_main_dashboard(ticker_input, exchange):
                         
                     prob_pct = max(prob_array) * 100
                     
-                    rf_inside_ensemble = model.named_estimators_['rf']
                     ml_details = {
                         "accuracy": test_accuracy,
                         "baseline": baseline_accuracy,
@@ -323,11 +309,11 @@ def render_main_dashboard(ticker_input, exchange):
                         "baseline_label": baseline_label,
                         "samples": len(ml_df),
                         "importances": {
-                            "Momentum": rf_inside_ensemble.feature_importances_[0],
-                            "Vol Surge": rf_inside_ensemble.feature_importances_[1],
-                            "Dist to SMA5": rf_inside_ensemble.feature_importances_[2],
-                            "ATR %": rf_inside_ensemble.feature_importances_[3],
-                            "Daily RSI": rf_inside_ensemble.feature_importances_[4]
+                            "Momentum": model.feature_importances_[0],
+                            "Vol Surge": model.feature_importances_[1],
+                            "Dist to SMA5": model.feature_importances_[2],
+                            "ATR %": model.feature_importances_[3],
+                            "Daily RSI": model.feature_importances_[4]
                         }
                     }
             
@@ -427,7 +413,7 @@ def render_main_dashboard(ticker_input, exchange):
                             <p style="margin: 0; font-size: 1rem; color: #555; text-transform: uppercase; font-weight: 600; margin-bottom: 10px;">5-Day Walk-Forward Validation</p>
                             <div style="text-align: left; padding: 8px; border-radius: 6px; border: 1px solid #DDD; display: inline-block;">{latest_result_html}</div>
                         </div>
-                        <p style="color: {ml_color}; font-size: 1.1rem; margin-top: 20px;"><em>Multi-class Heterogeneous Ensemble targeting sustained (10:15 AM) close thresholds</em></p>
+                        <p style="color: {ml_color}; font-size: 1.1rem; margin-top: 20px;"><em>Multi-class Random Forest Matrix targeting sustained (10:15 AM) close thresholds</em></p>
                     </div>
                     """,
                     unsafe_allow_html=True
