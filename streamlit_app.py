@@ -198,12 +198,19 @@ def render_main_dashboard(ticker_input, exchange):
             baseline_accuracy = 0.0
             true_edge = 0.0
             latest_result_html = ""
+            hist_long_pct = 0.0
+            hist_short_pct = 0.0
             
             if len(ml_df) > 10:
                 X = ml_df[['Closing_Momentum', 'Closing_Volume_Surge', 'Distance_to_Fast_SMA', 'ATR_Percent', 'Daily_RSI_14', 'VWAP_Distance', 'Frac_Diff_Close', 'OFI']].astype(float)
                 y = ml_df['Target']
                 
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
+                
+                # Historical class distribution from training data
+                target_counts = y.value_counts(normalize=True)
+                hist_long_pct = target_counts.get(1.0, 0.0) * 100
+                hist_short_pct = target_counts.get(-1.0, 0.0) * 100
                 
                 base_ensemble = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_leaf=15, class_weight='balanced', random_state=42)
                 
@@ -401,6 +408,8 @@ def render_main_dashboard(ticker_input, exchange):
                     'prob': prob_pct, 
                     'prob_long': prob_long,
                     'prob_short': prob_short,
+                    'hist_long': hist_long_pct,
+                    'hist_short': hist_short_pct,
                     'acc': test_accuracy * 100,
                     'baseline': baseline_accuracy * 100,
                     'baseline_label': baseline_label,
@@ -424,6 +433,16 @@ def render_main_dashboard(ticker_input, exchange):
                             <div style="background-color: rgba(255, 43, 43, 0.1); border: 1px solid #FF2B2B; padding: 10px 20px; border-radius: 8px;">
                                 <p style="margin: 0; font-size: 0.9rem; color: #555; text-transform: uppercase; font-weight: 600;">Short AMO</p>
                                 <h3 style="margin: 5px 0 0 0; color: #FF2B2B;">{prob_short:.1f}%</h3>
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: center; gap: 15px; margin-top: 15px;">
+                            <div style="background-color: rgba(0,0,0,0.03); padding: 8px 16px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.08);">
+                                <p style="margin: 0; font-size: 0.75rem; color: #888; text-transform: uppercase; font-weight: 600;">Historical Long</p>
+                                <h4 style="margin: 3px 0 0 0; color: #00C073; font-size: 1rem;">{hist_long_pct:.1f}%</h4>
+                            </div>
+                            <div style="background-color: rgba(0,0,0,0.03); padding: 8px 16px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.08);">
+                                <p style="margin: 0; font-size: 0.75rem; color: #888; text-transform: uppercase; font-weight: 600;">Historical Short</p>
+                                <h4 style="margin: 3px 0 0 0; color: #FF2B2B; font-size: 1rem;">{hist_short_pct:.1f}%</h4>
                             </div>
                         </div>
                         <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid rgba(0,0,0,0.05);">
@@ -527,6 +546,8 @@ with tab2:
                 "Prediction": info.get('label', 'N/A'),
                 "Long AMO (%)": round(info.get('prob_long', 0.0), 1),
                 "Short AMO (%)": round(info.get('prob_short', 0.0), 1),
+                "Hist Long (%)": round(info.get('hist_long', 0.0), 1),
+                "Hist Short (%)": round(info.get('hist_short', 0.0), 1),
                 "Model Accuracy (%)": round(info['acc'], 1),
                 "Baseline Accuracy (%)": round(info.get('baseline', 0.0), 1),
                 "Baseline Guess": info.get('baseline_label', 'N/A'),
@@ -614,9 +635,17 @@ with tab2:
                         <p style="margin: 0; font-size: 0.75rem; color: #777; text-transform: uppercase;">Long AMO</p>
                         <h4 style="margin: 5px 0 0 0; color: #00C073; font-size: 1.1rem;">{p_long:.1f}%</h4>
                     </div>
-                    <div style="flex: 1; text-align: center;">
+                    <div style="flex: 1; text-align: center; border-right: 1px solid rgba(0,0,0,0.05);">
                         <p style="margin: 0; font-size: 0.75rem; color: #777; text-transform: uppercase;">Short AMO</p>
                         <h4 style="margin: 5px 0 0 0; color: #FF2B2B; font-size: 1.1rem;">{p_short:.1f}%</h4>
+                    </div>
+                    <div style="flex: 1; text-align: center; border-right: 1px solid rgba(0,0,0,0.05);">
+                        <p style="margin: 0; font-size: 0.75rem; color: #777; text-transform: uppercase;">Hist Long</p>
+                        <h4 style="margin: 5px 0 0 0; color: #00C073; font-size: 1.1rem;">{w_data.get('hist_long', 0.0):.1f}%</h4>
+                    </div>
+                    <div style="flex: 1; text-align: center;">
+                        <p style="margin: 0; font-size: 0.75rem; color: #777; text-transform: uppercase;">Hist Short</p>
+                        <h4 style="margin: 5px 0 0 0; color: #FF2B2B; font-size: 1.1rem;">{w_data.get('hist_short', 0.0):.1f}%</h4>
                     </div>
                 </div>
             </div>
