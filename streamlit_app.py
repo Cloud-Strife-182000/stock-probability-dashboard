@@ -166,31 +166,10 @@ with st.expander("🛠️ Advanced Model Settings", expanded=False):
 # The model ALWAYS uses the 'confirmed' set for calculation
 selected_features = st.session_state['confirmed_features']
 
-# Watchlist Initialization (must happen before the batch upload expander)
+# Watchlist Initialization
 if 'watchlist' not in st.session_state:
     st.session_state['watchlist'] = {}
 
-with st.expander("📂 Batch Watchlist Import", expanded=False):
-    st.markdown("Upload a `.txt` file with one stock ticker per line. The model will run on each ticker using the currently selected features and add results to the watchlist.")
-    batch_uploaded_file = st.file_uploader("Select ticker file", type=["txt"], key="batch_upload")
-    if batch_uploaded_file is not None:
-        batch_tickers_raw = batch_uploaded_file.getvalue().decode("utf-8").splitlines()
-        batch_tickers = [line.strip().upper() for line in batch_tickers_raw if line.strip()]
-        if batch_tickers:
-            st.caption(f"{len(batch_tickers)} tickers detected: {', '.join(batch_tickers[:10])}{'...' if len(batch_tickers) > 10 else ''}")
-            if st.button(f"▶ Run Model on {len(batch_tickers)} Tickers & Add to Watchlist", type="primary"):
-                batch_progress = st.progress(0)
-                batch_status = st.empty()
-                for i, t in enumerate(batch_tickers):
-                    batch_status.text(f"Processing {t} ({i+1}/{len(batch_tickers)})...")
-                    render_main_dashboard(t, exchange, selected_features, render_ui=False)
-                    batch_progress.progress((i + 1) / len(batch_tickers))
-                    time.sleep(1.5)  # Respect yfinance rate limit
-                batch_status.success(f"Done! {len(batch_tickers)} tickers processed and added to the Watchlist.")
-                time.sleep(1)
-                st.rerun()
-        else:
-            st.warning("The uploaded file appears to be empty or has no valid ticker names.")
 
 def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=True):
     ctx = st.spinner(f"Fetching data and calculating indicators for {ticker_input}...") if render_ui else nullcontext()
@@ -686,6 +665,28 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
             if render_ui:
                 import traceback
                 st.error(f"An error occurred while fetching data: {e}\n\nTraceback: {traceback.format_exc()}")
+
+with st.expander("📂 Batch Watchlist Import", expanded=False):
+    st.markdown("Upload a `.txt` file with one stock ticker per line. The model will run on each ticker using the currently selected features and add results to the watchlist.")
+    batch_uploaded_file = st.file_uploader("Select ticker file", type=["txt"], key="batch_upload")
+    if batch_uploaded_file is not None:
+        batch_tickers_raw = batch_uploaded_file.getvalue().decode("utf-8").splitlines()
+        batch_tickers = [line.strip().upper() for line in batch_tickers_raw if line.strip()]
+        if batch_tickers:
+            st.caption(f"{len(batch_tickers)} tickers detected: {', '.join(batch_tickers[:10])}{'...' if len(batch_tickers) > 10 else ''}")
+            if st.button(f"▶ Run Model on {len(batch_tickers)} Tickers & Add to Watchlist", type="primary"):
+                batch_progress = st.progress(0)
+                batch_status = st.empty()
+                for i, t in enumerate(batch_tickers):
+                    batch_status.text(f"Processing {t} ({i+1}/{len(batch_tickers)})...")
+                    render_main_dashboard(t, exchange, selected_features, render_ui=False)
+                    batch_progress.progress((i + 1) / len(batch_tickers))
+                    time.sleep(1.5)  # Respect yfinance rate limit
+                batch_status.success(f"Done! {len(batch_tickers)} tickers processed and added to the Watchlist.")
+                time.sleep(1)
+                st.rerun()
+        else:
+            st.warning("The uploaded file appears to be empty or has no valid ticker names.")
 
 tab1, tab2 = st.tabs(["📊 Main Dashboard", "⭐ Watchlist"])
 
