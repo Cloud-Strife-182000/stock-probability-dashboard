@@ -217,8 +217,8 @@ def render_main_dashboard(ticker_input, exchange, selected_features):
             df['TimeStr'] = df['DatetimeObj'].dt.strftime('%H:%M')
             
             # Calculate rolling indicators directly on 1h chart
-            df['Closing_Momentum'] = (df['Close'] - df['Open']) / df['Open'] # Changed momentum calculation
-            df['Closing_Volume_Surge'] = df['Volume'] / df['Volume'].rolling(window=35).mean() # Changed window to 35
+            df['Closing_Momentum'] = (df['Close'] - df['Open']) / df['Open']
+            df['Closing_Volume_Surge'] = df['Volume'] / df['Volume'].rolling(window=35, min_periods=5).mean()
             
             # 3. MERGE DAILY DATA
             # 3. MERGE DAILY DATA (Stock + NIFTY Macro)
@@ -255,7 +255,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features):
             # 3.55 ORDER FLOW IMBALANCE
             hl_range = df['High'] - df['Low']
             hl_range = hl_range.replace(0, np.nan)
-            df['OFI'] = (((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / hl_range).rolling(window=5).mean()
+            df['OFI'] = (((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / hl_range).rolling(window=5, min_periods=1).mean()
             # 4. ENGINEER AMO TARGET (Positionally Anchored Sustained Trend)
             daily_targets = {}
             today_ist_str = pd.Timestamp.today(tz='Asia/Kolkata').strftime('%Y-%m-%d')
@@ -583,7 +583,14 @@ def render_main_dashboard(ticker_input, exchange, selected_features):
                     """, unsafe_allow_html=True)
                     
                     with st.expander("View AMO Machine Learning Model Details", expanded=False):
-                        st.markdown(f"**Valid Hourly Training Intervals:** {ml_details['samples']} market sessions")
+                        raw_sessions = df['DateStr'].nunique()
+                        trained_sessions = ml_details['samples']
+                        st.markdown(
+                            f"**Valid Hourly Training Intervals:** {trained_sessions} market sessions "
+                            f"<span style='color:#888; font-size:0.9em;'>({raw_sessions} total calendar sessions fetched — "
+                            f"difference accounts for weekends, NSE holidays, circuit-breaker days with missing candles, and rolling-indicator warmup)</span>",
+                            unsafe_allow_html=True
+                        )
                         
                         acc = ml_details['accuracy'] * 100
                         base = ml_details['baseline'] * 100
