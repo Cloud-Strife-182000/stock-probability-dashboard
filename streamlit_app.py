@@ -9,6 +9,8 @@ import urllib.request
 import xml.etree.ElementTree as ET
 import io
 import datetime
+import time
+from contextlib import nullcontext
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
@@ -164,14 +166,17 @@ with st.expander("🛠️ Advanced Model Settings", expanded=False):
 # The model ALWAYS uses the 'confirmed' set for calculation
 selected_features = st.session_state['confirmed_features']
 
-def render_main_dashboard(ticker_input, exchange, selected_features):
-    with st.spinner(f"Fetching data and calculating indicators for {ticker_input}..."):
+def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=True):
+    ctx = st.spinner(f"Fetching data and calculating indicators for {ticker_input}...") if render_ui else nullcontext()
+    with ctx:
         try:
             data_1d, data_1h, symbol = fetch_stock_data(ticker_input, exchange) # Changed data_15m to data_1h
             
             if data_1d.empty or data_1h.empty:
-                st.warning(f"No data found for {ticker_input}. Please check the ticker symbol.")
-                st.stop()
+                if render_ui:
+                    st.warning(f"No data found for {ticker_input}. Please check the ticker symbol.")
+                    st.stop()
+                return
             
             
             # 1. PROCESS DAILY DATA
@@ -461,8 +466,9 @@ def render_main_dashboard(ticker_input, exchange, selected_features):
                     }
             
             # 6. UI CONSTRUCTION LAYER
-            st.markdown("---")
-            st.markdown(f"<h2 style='text-align: left; color: black;'>Stock: <b style='color: #1D4ED8;'>{symbol}</b></h2>", unsafe_allow_html=True)
+            if render_ui:
+                st.markdown("---")
+                st.markdown(f"<h2 style='text-align: left; color: black;'>Stock: <b style='color: #1D4ED8;'>{symbol}</b></h2>", unsafe_allow_html=True)
 
             def render_indicator(col, title, value, title_color="gray"):
                 html = f"""
@@ -651,8 +657,9 @@ def render_main_dashboard(ticker_input, exchange, selected_features):
                     st.markdown("<p style='color: #888;'>No recent news articles found for this ticker.</p>", unsafe_allow_html=True)
             
         except Exception as e:
-            import traceback
-            st.error(f"An error occurred while fetching data: {e}\n\nTraceback: {traceback.format_exc()}")
+            if render_ui:
+                import traceback
+                st.error(f"An error occurred while fetching data: {e}\n\nTraceback: {traceback.format_exc()}")
 
 # Watchlist Initialization
 if 'watchlist' not in st.session_state:
@@ -677,6 +684,24 @@ with tab2:
     col_w1, col_w2 = st.columns([3, 1])
     with col_w1:
         st.markdown("### ⭐ Saved Watchlist")
+    with col_w2:
+        st.markdown("### 📥 Bulk Upload")
+        uploaded_file = st.file_uploader("Upload Tickers (.txt)", type=["txt"])
+        if uploaded_file is not None:
+             tickers = uploaded_file.getvalue().decode("utf-8").splitlines()
+             tickers_to_process = [line.strip().upper() for line in tickers if line.strip()]
+             if tickers_to_process:
+                 if st.button(f"Process {len(tickers_to_process)} Tickers", type="primary", use_container_width=True):
+                     progress_bar = st.progress(0)
+                     status_text = st.empty()
+                     for i, t in enumerate(tickers_to_process):
+                         status_text.text(f"Processing {t} ({i+1}/{len(tickers_to_process)})...")
+                         render_main_dashboard(t, exchange, selected_features, render_ui=False)
+                         progress_bar.progress((i + 1) / len(tickers_to_process))
+                         time.sleep(1.5)  # Rate limit
+                     status_text.text(f"Successfully processed batch! ({len(tickers_to_process)} tickers)")
+                     time.sleep(1)
+                     st.rerun()
     
     today_ist = pd.Timestamp.today(tz='Asia/Kolkata')
     
