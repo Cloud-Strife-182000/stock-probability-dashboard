@@ -9,7 +9,6 @@ import urllib.request
 import xml.etree.ElementTree as ET
 import io
 import datetime
-import time
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
@@ -165,263 +164,303 @@ with st.expander("🛠️ Advanced Model Settings", expanded=False):
 # The model ALWAYS uses the 'confirmed' set for calculation
 selected_features = st.session_state['confirmed_features']
 
-def calculate_model_forecast(ticker_input, exchange, selected_features):
-    """
-    Pure computation function that performs data fetching, feature engineering,
-    and Random Forest prediction. Returns a dictionary of all metrics.
-    """
-    try:
-        data_1d, data_1h, symbol = fetch_stock_data(ticker_input, exchange)
-        
-        if data_1d.empty or data_1h.empty:
-            return {"error": f"No data found for {ticker_input}."}
-        
-        # 1. PROCESS DAILY DATA
-        df_1d = data_1d.copy()
-        if isinstance(df_1d.columns, pd.MultiIndex):
-            df_1d.columns = [col[0] if isinstance(col, tuple) else col for col in df_1d.columns]
-        df_1d = df_1d.reset_index()
-        
-        if 'Date' in df_1d.columns:
-            df_1d['DateStr'] = pd.to_datetime(df_1d['Date']).dt.strftime('%Y-%m-%d')
-        elif 'Datetime' in df_1d.columns:
-            df_1d['DateStr'] = pd.to_datetime(df_1d['Datetime']).dt.strftime('%Y-%m-%d')
+def render_main_dashboard(ticker_input, exchange, selected_features):
+    with st.spinner(f"Fetching data and calculating indicators for {ticker_input}..."):
+        try:
+            data_1d, data_1h, symbol = fetch_stock_data(ticker_input, exchange) # Changed data_15m to data_1h
             
-        if 'Close' in df_1d.columns and len(df_1d) >= 14:
-            df_1d['Daily_SMA_5'] = df_1d['Close'].rolling(window=5).mean()
-            df_1d['Daily_ATR_14'] = df_1d.ta.atr(length=14)
-            df_1d['Daily_RSI_14'] = df_1d.ta.rsi(length=14)
+            if data_1d.empty or data_1h.empty:
+                st.warning(f"No data found for {ticker_input}. Please check the ticker symbol.")
+                st.stop()
             
-        # 1.5 MERGE NIFTY MACO DATA
-        nifty_df = fetch_nifty_data()
-        if not nifty_df.empty:
-            df_1d = pd.merge(df_1d, nifty_df, on='DateStr', how='left')
-            for col in ['Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']:
-                if col in df_1d.columns:
-                    df_1d[col] = df_1d[col].ffill()
             
-        # 2. PROCESS 1h DATA
-        df = data_1h.copy()
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns]
-        df = df.reset_index()
-        
-        dt_col = 'Datetime' if 'Datetime' in df.columns else 'Date'
-        df['DatetimeObj'] = pd.to_datetime(df[dt_col])
-        
-        if df['DatetimeObj'].dt.tz is not None:
-            df['DatetimeObj'] = df['DatetimeObj'].dt.tz_convert('Asia/Kolkata')
-        else:
-            df['DatetimeObj'] = df['DatetimeObj'].dt.tz_localize('Asia/Kolkata')
+            # 1. PROCESS DAILY DATA
+            df_1d = data_1d.copy()
+            if isinstance(df_1d.columns, pd.MultiIndex):
+                df_1d.columns = [col[0] if isinstance(col, tuple) else col for col in df_1d.columns]
+            df_1d = df_1d.reset_index()
             
-        df['DateStr'] = df['DatetimeObj'].dt.strftime('%Y-%m-%d')
-        df['TimeStr'] = df['DatetimeObj'].dt.strftime('%H:%M')
-        
-        df['Closing_Momentum'] = (df['Close'] - df['Open']) / df['Open']
-        df['Closing_Volume_Surge'] = df['Volume'] / df['Volume'].rolling(window=35, min_periods=5).mean()
-        
-        # 3. MERGE DAILY DATA
-        daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']
-        merge_cols = [c for c in daily_cols if c in df_1d.columns]
-        daily_subset = df_1d[merge_cols].dropna()
-        df = pd.merge(df, daily_subset, on='DateStr', how='left')
-        
-        for col in merge_cols:
-            if col != 'DateStr':
-                df[col] = df[col].ffill()
-        
-        df['Distance_to_Fast_SMA'] = (df['Close'] - df['Daily_SMA_5']) / df['Daily_SMA_5']
-        df['ATR_Percent'] = df['Daily_ATR_14'] / df['Close']
-        df['Typical_Price'] = (df['High'] + df['Low'] + df['Close']) / 3
-        df['TP_Volume'] = df['Typical_Price'] * df['Volume']
-        df['Cum_Vol'] = df.groupby('DateStr')['Volume'].cumsum()
-        df['Cum_TP_Vol'] = df.groupby('DateStr')['TP_Volume'].cumsum()
-        df['VWAP'] = df['Cum_TP_Vol'] / df['Cum_Vol']
-        df['VWAP_Distance'] = (df['Close'] - df['VWAP']) / df['VWAP']
-        df['Frac_Diff_Close'] = frac_diff_ffd(df['Close'], d=0.4)
-        
-        df = df.sort_values(['DateStr', 'DatetimeObj'])
-        day_opens = df.groupby('DateStr')['Open'].transform('first')
-        p1015 = df[df['TimeStr'] == '10:15'].set_index('DateStr')['Close']
-        df['Morning_Autocorr'] = (df['DateStr'].map(p1015) - day_opens) / day_opens
-        
-        hl_range = df['High'] - df['Low']
-        hl_range = hl_range.replace(0, np.nan)
-        df['OFI'] = (((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / hl_range).rolling(window=5, min_periods=1).mean()
-        
-        # 4. ENGINEER AMO TARGET
-        daily_targets = {}
-        today_ist_str = pd.Timestamp.today(tz='Asia/Kolkata').strftime('%Y-%m-%d')
-        market_open = pd.Timestamp.today(tz='Asia/Kolkata').hour < 16
-        
-        for date_str, group in df.groupby('DateStr'):
-            if market_open and date_str == today_ist_str:
-                continue
-            group = group.sort_values(by='DatetimeObj')
-            candle_915 = group[group['TimeStr'] == '09:15']
-            candle_1015 = group[group['TimeStr'] == '10:15']
-            if candle_915.empty or candle_1015.empty:
-                continue
-            open_price = candle_915.iloc[0]['Open']
-            close_price = candle_1015.iloc[0]['Close']
-            daily_targets[date_str] = 1.0 if close_price > open_price else -1.0
+            if 'Date' in df_1d.columns:
+                df_1d['DateStr'] = pd.to_datetime(df_1d['Date']).dt.strftime('%Y-%m-%d')
+            elif 'Datetime' in df_1d.columns:
+                df_1d['DateStr'] = pd.to_datetime(df_1d['Datetime']).dt.strftime('%Y-%m-%d')
+                
+            if 'Close' in df_1d.columns and len(df_1d) >= 14:
+                df_1d['Daily_SMA_5'] = df_1d['Close'].rolling(window=5).mean()
+                df_1d['Daily_ATR_14'] = df_1d.ta.atr(length=14)
+                df_1d['Daily_RSI_14'] = df_1d.ta.rsi(length=14)
+                
+            # 1.5 MERGE NIFTY MACO DATA
+            nifty_df = fetch_nifty_data()
+            if not nifty_df.empty:
+                df_1d = pd.merge(df_1d, nifty_df, on='DateStr', how='left')
+                # Forward fill nifty data in case of slight timestamp mismatches
+                for col in ['Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']:
+                    if col in df_1d.columns:
+                        df_1d[col] = df_1d[col].ffill()
+                
+            # 2. PROCESS 1h DATA
+            df = data_1h.copy() # Changed data_15m to data_1h
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns]
+            df = df.reset_index()
             
-        # 5. ML DATASET FILTRATION
-        ml_df = df.groupby('DateStr').tail(1).copy()
-        date_to_next_date = {}
-        dates = sorted(list(daily_targets.keys()))
-        for i in range(len(dates) - 1):
-            date_to_next_date[dates[i]] = dates[i+1]
+            dt_col = 'Datetime' if 'Datetime' in df.columns else 'Date'
+            df['DatetimeObj'] = pd.to_datetime(df[dt_col])
             
-        ml_df['Target'] = ml_df.apply(lambda r: daily_targets.get(date_to_next_date.get(r['DateStr'])), axis=1)
-        ml_view_df = ml_df.copy() # For Raw Data View
-        ml_df = ml_df.dropna(subset=selected_features + ['Target'])
-        
-        result_pkg = {
-            "symbol": symbol,
-            "df": df,
-            "ml_df": ml_df,
-            "ml_view_df": ml_view_df,
-            "success": False,
-            "today_features": None
-        }
-        
-        if len(ml_df) > 10:
-            X = ml_df[selected_features].astype(float)
-            y = ml_df['Target']
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
-            
-            target_counts = y.value_counts(normalize=True)
-            hist_long_pct = target_counts.get(1.0, 0.0) * 100
-            hist_short_pct = target_counts.get(-1.0, 0.0) * 100
-            
-            base_ensemble = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_leaf=15, class_weight='balanced', random_state=42)
-            eval_model = clone(base_ensemble)
-            eval_model.fit(X_train, y_train)
-            test_accuracy = eval_model.score(X_test, y_test)
-            baseline_accuracy = pd.Series(y_test).value_counts(normalize=True).max()
-            baseline_class_raw = pd.Series(y_test).value_counts(normalize=True).idxmax()
-            baseline_label = "LONG" if baseline_class_raw == 1.0 else "SHORT"
-            true_edge = test_accuracy - baseline_accuracy
-            
-            # Validation
-            today_ist_wf = pd.Timestamp.today(tz='Asia/Kolkata')
-            last_df_date_str_wf = df['DateStr'].iloc[-1]
-            is_current_day_live = (today_ist_wf.hour < 16 and last_df_date_str_wf == today_ist_wf.strftime('%Y-%m-%d'))
-            
-            def get_amo_val(val): return "LONG" if val == 1.0 else "SHORT"
-            lookback_days = min(5, len(X) - 2)
-            correct_count = 0
-            eval_results = []
-            if lookback_days > 0:
-                start_idx = 2 if is_current_day_live else 1
-                for i in range(start_idx, min(lookback_days + start_idx, len(X))):
-                    test_idx = -i
-                    eval_wf_model = clone(base_ensemble)
-                    eval_wf_model.fit(X.iloc[:test_idx], y.iloc[:test_idx])
-                    pred_y = eval_wf_model.predict(X.iloc[[test_idx]])[0]
-                    actual_y = y.iloc[test_idx]
-                    is_correct = (pred_y == actual_y)
-                    if is_correct: correct_count += 1
-                    actual_lbl = get_amo_val(actual_y)
-                    pred_lbl = get_amo_val(pred_y)
-                    feature_date = ml_df.iloc[test_idx]['DateStr']
-                    date_label = date_to_next_date.get(feature_date, feature_date)
-                    color = "#00C073" if is_correct else "#FF2B2B"
-                    icon = "✅" if is_correct else "❌"
-                    status_text = f"Validated" if is_correct else f"Failed (Act {actual_lbl})"
-                    eval_results.append(f"<li style='margin-bottom: 4px;'><span style='color: {color};'>{icon} {date_label}: {status_text} (Predicted {pred_lbl})</span></li>")
-                eval_results.reverse()
-                latest_result_html = f"<div style='margin-bottom: 8px;'><b style='color: black;'>Recent Regime Sync: {correct_count}/{len(eval_results)} Correct</b></div>"
-                latest_result_html += f"<ul style='list-style-type: none; padding-left: 0; margin: 0; font-size: 0.95rem;'>" + "".join(eval_results) + "</ul>"
+            if df['DatetimeObj'].dt.tz is not None:
+                df['DatetimeObj'] = df['DatetimeObj'].dt.tz_convert('Asia/Kolkata')
             else:
-                latest_result_html = "<span>Not enough data for 5-Day Validation.</span>"
+                df['DatetimeObj'] = df['DatetimeObj'].dt.tz_localize('Asia/Kolkata')
                 
-            # Prediction Model
-            model = clone(base_ensemble)
-            if market_open and last_df_date_str_wf == today_ist_str:
-                model.fit(X.iloc[:-1], y.iloc[:-1])
-                available_dates = list(df['DateStr'].unique())
-                feature_day_str = available_dates[-2] if len(available_dates) > 1 else available_dates[-1]
-                today_features = df[df['DateStr'] == feature_day_str].tail(1)[selected_features].astype(float)
-                forecast_type = "Current Day"
-            else:
-                model.fit(X, y)
-                today_features = df.groupby('DateStr').tail(1).iloc[-1][selected_features].to_frame().T.astype(float)
-                forecast_type = "Next Day"
+            df['DateStr'] = df['DatetimeObj'].dt.strftime('%Y-%m-%d')
+            df['TimeStr'] = df['DatetimeObj'].dt.strftime('%H:%M')
+            
+            # Calculate rolling indicators directly on 1h chart
+            df['Closing_Momentum'] = (df['Close'] - df['Open']) / df['Open']
+            df['Closing_Volume_Surge'] = df['Volume'] / df['Volume'].rolling(window=35, min_periods=5).mean()
+            
+            # 3. MERGE DAILY DATA
+            # 3. MERGE DAILY DATA (Stock + NIFTY Macro)
+            daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']
+            merge_cols = [c for c in daily_cols if c in df_1d.columns]
+            daily_subset = df_1d[merge_cols].dropna()
+            df = pd.merge(df, daily_subset, on='DateStr', how='left')
+            
+            # Forward fill all merged daily indicators to ensure 1h rows have macro context
+            for col in merge_cols:
+                if col != 'DateStr':
+                    df[col] = df[col].ffill()
+            
+            df['Distance_to_Fast_SMA'] = (df['Close'] - df['Daily_SMA_5']) / df['Daily_SMA_5']
+            df['ATR_Percent'] = df['Daily_ATR_14'] / df['Close']
+            
+            # 3.5 ADVANCED INTRADAY FEATURES
+            df['Typical_Price'] = (df['High'] + df['Low'] + df['Close']) / 3
+            df['TP_Volume'] = df['Typical_Price'] * df['Volume']
+            df['Cum_Vol'] = df.groupby('DateStr')['Volume'].cumsum()
+            df['Cum_TP_Vol'] = df.groupby('DateStr')['TP_Volume'].cumsum()
+            df['VWAP'] = df['Cum_TP_Vol'] / df['Cum_Vol']
+            df['VWAP_Distance'] = (df['Close'] - df['VWAP']) / df['VWAP']
+            
+            # 3.55 DYNAMIC FEATURES
+            df['Frac_Diff_Close'] = frac_diff_ffd(df['Close'], d=0.4)
+            
+            # 3.55 MORNING AUTOCORRELATION (10:15 AM Price vs Open)
+            df = df.sort_values(['DateStr', 'DatetimeObj'])
+            day_opens = df.groupby('DateStr')['Open'].transform('first')
+            p1015 = df[df['TimeStr'] == '10:15'].set_index('DateStr')['Close']
+            df['Morning_Autocorr'] = (df['DateStr'].map(p1015) - day_opens) / day_opens
+            
+            # 3.55 ORDER FLOW IMBALANCE
+            hl_range = df['High'] - df['Low']
+            hl_range = hl_range.replace(0, np.nan)
+            df['OFI'] = (((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / hl_range).rolling(window=5, min_periods=1).mean()
+            # 4. ENGINEER AMO TARGET (Positionally Anchored Sustained Trend)
+            daily_targets = {}
+            today_ist_str = pd.Timestamp.today(tz='Asia/Kolkata').strftime('%Y-%m-%d')
+            market_open = pd.Timestamp.today(tz='Asia/Kolkata').hour < 16
+            
+            for date_str, group in df.groupby('DateStr'):
+                # Do not compute today's target while the market is still open.
+                # We are currently predicting for the current session, so including
+                # today's 10:15 AM outcome would contaminate the training set.
+                if market_open and date_str == today_ist_str:
+                    continue
                 
-            if not today_features.isna().any().any():
-                prob_array = model.predict_proba(today_features)[0]
-                pred_class = model.predict(today_features)[0]
-                class_labels = list(model.classes_)
-                prob_long = prob_array[class_labels.index(1.0)] * 100 if 1.0 in class_labels else 0.0
-                prob_short = prob_array[class_labels.index(-1.0)] * 100 if -1.0 in class_labels else 0.0
+                group = group.sort_values(by='DatetimeObj')
                 
-                rev_map = {v: k for k, v in FEATURE_MAP.items()}
-                importances_dict = {rev_map[f]: model.feature_importances_[i] for i, f in enumerate(selected_features)}
+                # Explicitly look up the 9:15 AM candle (market open) and 10:15 AM candle
+                # to avoid misalignment caused by missing candles (circuit limits, API drops).
+                candle_915 = group[group['TimeStr'] == '09:15']
+                candle_1015 = group[group['TimeStr'] == '10:15']
                 
-                result_pkg.update({
-                    "success": True,
-                    "prob_pct": max(prob_array) * 100,
-                    "prob_long": prob_long,
-                    "prob_short": prob_short,
-                    "pred_class": pred_class,
-                    "forecast_type": forecast_type,
-                    "latest_result_html": latest_result_html,
-                    "hist_long_pct": hist_long_pct,
-                    "hist_short_pct": hist_short_pct,
-                    "ml_details": {
+                if candle_915.empty or candle_1015.empty:
+                    continue  # Skip days where either key candle is missing
+                    
+                open_price = candle_915.iloc[0]['Open']
+                close_price = candle_1015.iloc[0]['Close']
+                
+                if close_price > open_price:
+                    daily_targets[date_str] = 1.0
+                else:
+                    daily_targets[date_str] = -1.0
+            
+            # 5. ML DATASET FILTRATION (Strictly Final Hourly Candles)
+            ml_df = df.groupby('DateStr').tail(1).copy()
+            
+            date_to_next_date = {}
+            dates = sorted(list(daily_targets.keys()))
+            for i in range(len(dates) - 1):
+                date_to_next_date[dates[i]] = dates[i+1]
+                
+            def map_target(row):
+                next_date = date_to_next_date.get(row['DateStr'])
+                if next_date and next_date in daily_targets:
+                    return daily_targets[next_date]
+                return float('nan')
+                
+            ml_df['Target'] = ml_df.apply(map_target, axis=1)
+            
+            # ML DropNA strictly applies to ALL selected features plus the resulting prediction target
+            ml_df = ml_df.dropna(subset=selected_features + ['Target'])
+            
+            bullish_prob = None
+            ml_details = None
+            ml_pred_label = ""
+            ml_color = "#AAAAAA"
+            ml_bg_color = "rgba(128,128,128,0.05)"
+            prob_pct = 0.0
+            prob_long = 0.0
+            prob_short = 0.0
+            test_accuracy = 0.0
+            baseline_accuracy = 0.0
+            true_edge = 0.0
+            latest_result_html = ""
+            hist_long_pct = 0.0
+            hist_short_pct = 0.0
+            
+            if len(ml_df) > 10:
+                X = ml_df[selected_features].astype(float)
+                y = ml_df['Target']
+                
+                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
+                
+                # Historical class distribution from training data
+                target_counts = y.value_counts(normalize=True)
+                hist_long_pct = target_counts.get(1.0, 0.0) * 100
+                hist_short_pct = target_counts.get(-1.0, 0.0) * 100
+                
+                base_ensemble = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_leaf=15, class_weight='balanced', random_state=42)
+                
+                eval_model = clone(base_ensemble)
+                eval_model.fit(X_train, y_train)
+                test_accuracy = eval_model.score(X_test, y_test)
+                
+                y_test_series = pd.Series(y_test)
+                baseline_accuracy = y_test_series.value_counts(normalize=True).max()
+                
+                baseline_class_raw = y_test_series.value_counts(normalize=True).idxmax()
+                
+                if baseline_class_raw == 1.0:
+                    baseline_label = "LONG"
+                else:
+                    baseline_label = "SHORT"
+                    
+                true_edge = test_accuracy - baseline_accuracy
+                
+                today_ist_wf = pd.Timestamp.today(tz='Asia/Kolkata')
+                last_df_date_str_wf = df['DateStr'].iloc[-1]
+                is_current_day_live = (today_ist_wf.hour < 16 and last_df_date_str_wf == today_ist_wf.strftime('%Y-%m-%d'))
+                
+                # 5-Day Walk-Forward Validation
+                def get_amo_val(val):
+                    return "LONG" if val == 1.0 else "SHORT"
+                    
+                lookback_days = min(5, len(X) - 2)
+                correct_count = 0
+                eval_results = []
+                
+                if lookback_days > 0:
+                    start_idx = 2 if is_current_day_live else 1
+                    end_idx = lookback_days + start_idx
+                    max_available = len(X) - 1
+                    
+                    for i in range(start_idx, min(end_idx, max_available + 1)):
+                        test_idx = -i
+                        eval_wf_model = clone(base_ensemble)
+                        
+                        eval_wf_model.fit(X.iloc[:test_idx], y.iloc[:test_idx])
+                            
+                        # Process single validation day
+                        test_X = X.iloc[[test_idx]]
+                        actual_y = y.iloc[test_idx]
+                        
+                        pred_y = eval_wf_model.predict(test_X)[0]
+                        
+                        is_correct = (pred_y == actual_y)
+                        if is_correct:
+                            correct_count += 1
+                            
+                        actual_lbl = get_amo_val(actual_y)
+                        pred_lbl = get_amo_val(pred_y)
+                        
+                        feature_date = ml_df.iloc[test_idx]['DateStr']
+                        date_label = date_to_next_date.get(feature_date, feature_date)
+                        
+                        if is_correct:
+                            eval_results.append(f"<li style='margin-bottom: 4px;'><span style='color: #00C073;'>✅ {date_label}: Validated (Predicted {pred_lbl})</span></li>")
+                        else:
+                            eval_results.append(f"<li style='margin-bottom: 4px;'><span style='color: #FF2B2B;'>❌ {date_label}: Failed (Pred {pred_lbl} ≠ Act {actual_lbl})</span></li>")
+                            
+                    eval_results.reverse() # Show oldest to newest
+                    
+                    val_count = len(eval_results)
+                    latest_result_html = f"<div style='margin-bottom: 8px;'><b style='color: black;'>Recent Regime Sync: {correct_count}/{val_count} Correct</b></div>"
+                    latest_result_html += f"<ul style='list-style-type: none; padding-left: 0; margin: 0; font-size: 0.95rem;'>" + "".join(eval_results) + "</ul>"
+                else:
+                    latest_result_html = "<span>Not enough data for 5-Day Validation.</span>"
+                
+                # Primary model must train strictly preserving out-of-sample prediction integrity
+                model = clone(base_ensemble)
+                
+                today_ist = pd.Timestamp.today(tz='Asia/Kolkata')
+                last_df_date_str = df['DateStr'].iloc[-1]
+                
+                if today_ist.hour < 16 and last_df_date_str == today_ist.strftime('%Y-%m-%d'):
+                    # Market is still open. Predict for TODAY using YESTERDAY's data.
+                    # CRITICAL: Since today's 10:15 close exists in the dataset, yesterday's row in X 
+                    # now contains today's true target. To prevent data leakage, we must exclude the 
+                    # final row of X from the training set when generating the 'Current Day' prediction!
+                    model.fit(X.iloc[:-1], y.iloc[:-1])
+                    
+                    available_dates = list(df['DateStr'].unique())
+                    feature_day_str = available_dates[-2] if len(available_dates) > 1 else available_dates[-1]
+                    today_features = df[df['DateStr'] == feature_day_str].tail(1)[selected_features].astype(float)
+                    st.session_state['forecast_type'] = "Current Day"
+                else:
+                    # Market is closed (>= 4PM). Predict for TOMORROW using TODAY's data.
+                    model.fit(X, y)
+                    
+                    today_features = df.groupby('DateStr').tail(1).iloc[-1][selected_features].to_frame().T.astype(float)
+                    st.session_state['forecast_type'] = "Next Day"
+
+                if not today_features.isna().any().any():
+                    prob_array = model.predict_proba(today_features)[0]
+                    pred_class = model.predict(today_features)[0]
+                    
+                    class_labels = list(model.classes_)
+                    try:
+                        prob_long = prob_array[class_labels.index(1.0)] * 100 if 1.0 in class_labels else 0.0
+                        prob_short = prob_array[class_labels.index(-1.0)] * 100 if -1.0 in class_labels else 0.0
+                    except ValueError:
+                        pass
+                    
+                    if pred_class == 1.0:
+                        ml_pred_label = "LONG AMO"
+                        ml_color = "#00C073" # Green
+                        ml_bg_color = "rgba(0, 192, 115, 0.05)"
+                    else:
+                        ml_pred_label = "SHORT AMO"
+                        ml_color = "#FF2B2B" # Red
+                        ml_bg_color = "rgba(255, 43, 43, 0.05)"
+                        
+                    prob_pct = max(prob_array) * 100
+                    
+                    # Dynamic Importance Mapping
+                    rev_map = {v: k for k, v in FEATURE_MAP.items()}
+                    importances_dict = {rev_map[f]: model.feature_importances_[i] for i, f in enumerate(selected_features)}
+                    
+                    ml_details = {
                         "accuracy": test_accuracy,
                         "baseline": baseline_accuracy,
                         "true_edge": true_edge,
                         "baseline_label": baseline_label,
                         "samples": len(ml_df),
                         "importances": importances_dict
-                    },
-                    "today_features": today_features
-                })
-        return result_pkg
-    except Exception as e:
-        import traceback
-        return {"error": f"An error occurred during calculation: {e}\n\nTraceback: {traceback.format_exc()}"}
-
-def render_main_dashboard(ticker_input, exchange, selected_features):
-    with st.spinner(f"Processing AMO logic for {ticker_input}..."):
-        try:
-            res = calculate_model_forecast(ticker_input, exchange, selected_features)
+                    }
             
-            if "error" in res:
-                st.error(res["error"])
-                return
-                
-            symbol = res["symbol"]
-            df = res["df"]
-            ml_df = res["ml_df"]
-            ml_view_df = res["ml_view_df"]
-            today_features = res["today_features"]
-            
-            if not res["success"]:
-                st.warning("Insufficient historical data (>10 sessions) for machine learning training.")
-                return
-
-            st.session_state['forecast_type'] = res["forecast_type"]
-            prob_pct = res["prob_pct"]
-            prob_long = res["prob_long"]
-            prob_short = res["prob_short"]
-            pred_class = res["pred_class"]
-            latest_result_html = res["latest_result_html"]
-            ml_details = res["ml_details"]
-            
-            ml_pred_label = "LONG AMO" if pred_class == 1.0 else "SHORT AMO"
-            ml_color = "#00C073" if pred_class == 1.0 else "#FF2B2B"
-            ml_bg_color = "rgba(0,192,115,0.05)" if pred_class == 1.0 else "rgba(255,43,43,0.05)"
-                
             # 6. UI CONSTRUCTION LAYER
-            # Use existing results mapping for UI
-            hist_long_pct = res["hist_long_pct"]
-            hist_short_pct = res["hist_short_pct"]
-            
-            # Consistent layout
             st.markdown("---")
             st.markdown(f"<h2 style='text-align: left; color: black;'>Stock: <b style='color: #1D4ED8;'>{symbol}</b></h2>", unsafe_allow_html=True)
 
@@ -638,62 +677,6 @@ with tab2:
     col_w1, col_w2 = st.columns([3, 1])
     with col_w1:
         st.markdown("### ⭐ Saved Watchlist")
-    
-    with st.expander("📥 Bulk Import Tickers from Text File", expanded=False):
-        st.markdown("Upload a `.txt` file with one stock ticker per line (e.g., RELIANCE, TCS).")
-        uploaded_file = st.file_uploader("Choose a text file", type="txt", key="bulk_import_uploader")
-        
-        if uploaded_file is not None and st.button("🚀 Process & Add to Watchlist", use_container_width=True):
-            tickers_to_process = [line.decode("utf-8").strip() for line in uploaded_file if line.decode("utf-8").strip()]
-            
-            if not tickers_to_process:
-                st.warning("The uploaded file is empty.")
-            else:
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                results_log = []
-                
-                for idx, ticker in enumerate(tickers_to_process):
-                    status_text.text(f"Processing {ticker}... ({idx+1}/{len(tickers_to_process)})")
-                    
-                    # Run model with currently selected features
-                    res = calculate_model_forecast(ticker, exchange, selected_features)
-                    
-                    if res.get("success"):
-                        w_data = {
-                            'prob': res['prob_pct'],
-                            'label': "LONG AMO" if res['pred_class'] == 1.0 else "SHORT AMO",
-                            'color': "#00C073" if res['pred_class'] == 1.0 else "#FF2B2B",
-                            'bg_color': "rgba(0,192,115,0.05)" if res['pred_class'] == 1.0 else "rgba(255,43,43,0.05)",
-                            'acc': res['ml_details']['accuracy'] * 100,
-                            'edge': res['ml_details']['true_edge'] * 100,
-                            'baseline': res['ml_details']['baseline'] * 100,
-                            'baseline_label': res['ml_details']['baseline_label'],
-                            'latest_result': res['latest_result_html'],
-                            'selected_features': ", ".join([{v: k for k, v in FEATURE_MAP.items()}.get(f, f) for f in selected_features]),
-                            'prob_long': res['prob_long'],
-                            'prob_short': res['prob_short'],
-                            'hist_long': res['hist_long_pct'],
-                            'hist_short': res['hist_short_pct'],
-                            'features_impact': res['ml_details']['importances']
-                        }
-                        st.session_state['watchlist'][res['symbol']] = w_data
-                        results_log.append(f"✅ {ticker} added.")
-                    else:
-                        error_msg = res.get("error", "Unknown error")
-                        results_log.append(f"❌ {ticker} failed: {error_msg}")
-                    
-                    progress_bar.progress((idx + 1) / len(tickers_to_process))
-                    
-                    # Rate limiting to respect yfinance (2 sec per ticker)
-                    if idx < len(tickers_to_process) - 1:
-                        time.sleep(2.0)
-                
-                st.success(f"Bulk processing complete! {len(tickers_to_process)} tickers checked.")
-                with st.expander("Show Processing Log", expanded=False):
-                    for log in results_log:
-                        st.write(log)
-                st.rerun()
     
     today_ist = pd.Timestamp.today(tz='Asia/Kolkata')
     
