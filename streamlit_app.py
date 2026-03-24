@@ -256,10 +256,18 @@ def render_main_dashboard(ticker_input, exchange, selected_features):
             hl_range = df['High'] - df['Low']
             hl_range = hl_range.replace(0, np.nan)
             df['OFI'] = (((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / hl_range).rolling(window=5).mean()
-            
             # 4. ENGINEER AMO TARGET (Positionally Anchored Sustained Trend)
             daily_targets = {}
+            today_ist_str = pd.Timestamp.today(tz='Asia/Kolkata').strftime('%Y-%m-%d')
+            market_open = pd.Timestamp.today(tz='Asia/Kolkata').hour < 16
+            
             for date_str, group in df.groupby('DateStr'):
+                # Do not compute today's target while the market is still open.
+                # We are currently predicting for the current session, so including
+                # today's 10:15 AM outcome would contaminate the training set.
+                if market_open and date_str == today_ist_str:
+                    continue
+                
                 group = group.sort_values(by='DatetimeObj')
                 
                 # Explicitly look up the 9:15 AM candle (market open) and 10:15 AM candle
