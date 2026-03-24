@@ -681,27 +681,26 @@ if ticker_input:
 st.session_state['skip_render'] = False
 
 with tab2:
-    col_w1, col_w2 = st.columns([3, 1])
-    with col_w1:
+    wl_header_col, wl_upload_col = st.columns([2, 1])
+    with wl_header_col:
         st.markdown("### ⭐ Saved Watchlist")
-    with col_w2:
-        st.markdown("### 📥 Bulk Upload")
-        uploaded_file = st.file_uploader("Upload Tickers (.txt)", type=["txt"])
+    with wl_upload_col:
+        uploaded_file = st.file_uploader("📂 Batch import tickers (.txt)", type=["txt"], label_visibility="collapsed")
         if uploaded_file is not None:
-             tickers = uploaded_file.getvalue().decode("utf-8").splitlines()
-             tickers_to_process = [line.strip().upper() for line in tickers if line.strip()]
-             if tickers_to_process:
-                 if st.button(f"Process {len(tickers_to_process)} Tickers", type="primary", use_container_width=True):
-                     progress_bar = st.progress(0)
-                     status_text = st.empty()
-                     for i, t in enumerate(tickers_to_process):
-                         status_text.text(f"Processing {t} ({i+1}/{len(tickers_to_process)})...")
-                         render_main_dashboard(t, exchange, selected_features, render_ui=False)
-                         progress_bar.progress((i + 1) / len(tickers_to_process))
-                         time.sleep(1.5)  # Rate limit
-                     status_text.text(f"Successfully processed batch! ({len(tickers_to_process)} tickers)")
-                     time.sleep(1)
-                     st.rerun()
+            tickers = uploaded_file.getvalue().decode("utf-8").splitlines()
+            tickers_to_process = [line.strip().upper() for line in tickers if line.strip()]
+            if tickers_to_process:
+                if st.button(f"▶ Process {len(tickers_to_process)} Tickers", type="primary", use_container_width=True):
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                    for i, t in enumerate(tickers_to_process):
+                        status_text.text(f"Processing {t} ({i+1}/{len(tickers_to_process)})...")
+                        render_main_dashboard(t, exchange, selected_features, render_ui=False)
+                        progress_bar.progress((i + 1) / len(tickers_to_process))
+                        time.sleep(1.5)  # Rate limit
+                    status_text.text(f"Done! {len(tickers_to_process)} tickers added to watchlist.")
+                    time.sleep(1)
+                    st.rerun()
     
     today_ist = pd.Timestamp.today(tz='Asia/Kolkata')
     
