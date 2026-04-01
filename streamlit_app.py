@@ -648,6 +648,11 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                     with st.expander("View Raw Hourly Machine Learning Training Data", expanded=False):
                         st.markdown("This targeted intraday matrix maps exclusively the final hourly closing datasets evaluated natively across 730 days exactly against the sustained 10:15 AM close target thresholds:")
                         display_df = ml_df[selected_features + ['Target', 'DateStr']].copy()
+                        
+                        # Apply the same exact training boundary cut-off to reflect the true model state without leaks
+                        train_limit = st.session_state.get('training_end_day_str', display_df['DateStr'].iloc[-1])
+                        display_df = display_df[display_df['DateStr'] <= train_limit]
+                        
                         display_df = display_df.set_index('DateStr')
                         st.dataframe(display_df, use_container_width=True)
                     
