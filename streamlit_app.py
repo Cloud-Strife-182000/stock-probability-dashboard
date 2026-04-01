@@ -544,6 +544,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                         "true_edge": true_edge,
                         "baseline_label": baseline_label,
                         "samples": len(ml_df),
+                        "test_samples": len(y_test),
                         "importances": importances_dict
                     }
             
@@ -613,6 +614,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                     'hist_long': hist_long_pct,
                     'hist_short': hist_short_pct,
                     'acc': test_accuracy * 100,
+                    'test_samples': len(y_test),
                     'baseline': baseline_accuracy * 100,
                     'baseline_label': baseline_label,
                     'edge': true_edge * 100,
@@ -688,7 +690,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                         
                         st.markdown(f"""
                         <ul style="list-style-type: none; padding-left: 0; margin-top: 10px; margin-bottom: 20px;">
-                            <li><b>Predictive Accuracy:</b> {acc:.1f}%</li>
+                            <li><b>Predictive Accuracy:</b> {acc:.1f}% <span style="color: #666; font-size: 0.9em;">(Tested on {ml_details['test_samples']} Out-of-Sample sessions)</span></li>
                             <li><b>Baseline Accuracy:</b> {base:.1f}% <span style="color: #666; font-size: 0.9em;">(Always guessing '{ml_details['baseline_label']}')</span></li>
                             <li><b>True Edge:</b> <span style="color: {edge_color}; font-weight: bold;">{edge:+.1f}%</span></li>
                         </ul>
@@ -814,6 +816,7 @@ with tab2:
                 "Hist Long (%)": round(info.get('hist_long', 0.0), 1),
                 "Hist Short (%)": round(info.get('hist_short', 0.0), 1),
                 "Model Accuracy (%)": round(info['acc'], 1),
+                "Out-of-Sample Count": info.get('test_samples', 'N/A'),
                 "Baseline Accuracy (%)": round(info.get('baseline', 0.0), 1),
                 "Baseline Guess": info.get('baseline_label', 'N/A'),
                 "True Edge (%)": round(info.get('edge', 0.0), 1),
@@ -885,7 +888,7 @@ with tab2:
                     </div>
                     <div style="flex: 1; text-align: right;">
                         <p style="margin: 0; font-size: 0.85rem; color: #555; font-weight: 600; text-transform: uppercase;">AMO Model Accuracy</p>
-                        <h3 style="margin: 5px 0 0 0; color: black; font-size: 1.4rem;">{w_data['acc']:.1f}%</h3>
+                        <h3 style="margin: 5px 0 0 0; color: black; font-size: 1.4rem;">{w_data['acc']:.1f}% <span style="font-size: 0.9rem; color: #888; font-weight: 400;">(n={w_data.get('test_samples', '?')})</span></h3>
                         <div style="margin-top: 5px;">
                             <span style="font-size: 0.8rem; color: #777;">Base: {w_data.get('baseline', 0.0):.1f}% ({w_data.get('baseline_label', 'N/A')})</span> | 
                             <span style="font-size: 0.8rem; color: {'#00C073' if w_data.get('edge', 0.0) > 0 else '#FF2B2B'}; font-weight: bold;">Edge: {w_data.get('edge', 0.0):+.1f}%</span>

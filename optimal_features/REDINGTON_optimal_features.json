@@ -1,0 +1,12 @@
+{
+    "ticker": "REDINGTON",
+    "exchange": "NSE",
+    "best_accuracy": 0.75,
+    "best_features": [
+        "Distance_to_Fast_SMA",
+        "ATR_Percent",
+        "OFI",
+        "Morning_Autocorr"
+    ],
+    "dataset_rows": 477
+}

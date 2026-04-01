@@ -279,12 +279,16 @@ if __name__ == "__main__":
     print(f"Highest Out-of-Sample Accuracy: {best_acc:.4f}")
     print(f"Optimal Features: {list(best_features)}")
     
+    _, X_test_example, _, _ = train_test_split(ml_df, y, test_size=0.2, shuffle=False)
+    out_of_sample_size = len(X_test_example)
+    
     output_data = {
         "ticker": args.ticker,
         "exchange": args.exchange,
         "best_accuracy": best_acc,
         "best_features": list(best_features),
-        "dataset_rows": len(ml_df)
+        "dataset_rows": len(ml_df),
+        "out_of_sample_size": out_of_sample_size
     }
     
     os.makedirs("optimal_features", exist_ok=True)
