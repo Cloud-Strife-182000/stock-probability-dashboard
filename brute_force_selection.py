@@ -211,7 +211,10 @@ def prepare_data(ticker, exchange):
         
     ml_df['Target'] = ml_df.apply(map_target, axis=1)
     
-    # DO NOT drop NAs globally. The dashboard strictly drops NAs dynamically based ONLY on the actual selected features.
+    # 1. Clear out active/incomplete sessions where the target doesn't exist yet
+    ml_df = ml_df.dropna(subset=['Target'])
+    
+    # Features remain dynamically evaluated inside evaluate_combination.
     return ml_df
 
 def evaluate_combination(args):
@@ -225,7 +228,7 @@ def evaluate_combination(args):
         return feature_combo, 0.0, 0, 0
         
     X = ml_df_subset[combo_list].astype(float)
-    y_series = ml_df_subset['Target'].astype(float)
+    y_series = ml_df_subset['Target']
     X_train, X_test, y_train, y_test = train_test_split(X, y_series, test_size=0.2, shuffle=False)
     
     model = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_leaf=15, class_weight='balanced', random_state=42)
@@ -251,7 +254,8 @@ if __name__ == "__main__":
         print("Not enough raw data to train the model.")
         sys.exit(1)
         
-    print(f"Dataset prepared. Total raw rows available: {len(ml_df)}")
+    last_valid_date = ml_df.iloc[-1]['DateStr']
+    print(f"Dataset prepared. Total raw valid rows available: {len(ml_df)} | Last Valid Training Date: {last_valid_date}")
     
     # Generate all combinations
     all_combinations = []
@@ -261,10 +265,8 @@ if __name__ == "__main__":
     total_combinations = len(all_combinations)
     print(f"Total combinations to test: {total_combinations}")
     
+    all_results = []
     best_acc = 0.0
-    best_features = None
-    best_rows = 0
-    best_test_size = 0
     
     completed = 0
     start_time = time.time()
@@ -276,42 +278,40 @@ if __name__ == "__main__":
         for future in concurrent.futures.as_completed(futures):
             combo, acc, c_rows, c_test_size = future.result()
             
-            # Using strict deterministic conditions to handle exact ties in accuracy 
-            # (which otherwise return non-deterministically due to multiprocessing completion speed)
-            if acc > best_acc:
-                best_acc = acc
-                best_features = combo
-                best_rows = c_rows
-                best_test_size = c_test_size
-            elif acc == best_acc and best_features is not None:
-                # Tie-breaker 1: Prefer fewer features (simpler model)
-                if len(combo) < len(best_features):
-                    best_features = combo
-                    best_rows = c_rows
-                    best_test_size = c_test_size
-                # Tie-breaker 2: If same number of features, sort alphabetically for exact determinism
-                elif len(combo) == len(best_features):
-                    if sorted(list(combo)) < sorted(list(best_features)):
-                        best_features = combo
-                        best_rows = c_rows
-                        best_test_size = c_test_size
+            # Store all combinations to cleanly extract a Top-3 leaderboard later
+            all_results.append((acc, len(combo), tuple(sorted(list(combo))), combo, c_rows, c_test_size))
+            best_acc = max(best_acc, acc)
                 
             completed += 1
             if completed % 500 == 0 or completed == total_combinations:
                 elapsed = time.time() - start_time
                 print(f"Processed {completed}/{total_combinations} | Best Acc: {best_acc:.4f} | Time: {elapsed:.1f}s")
 
+    # Tie-breaker deterministic sorting:
+    # 1. Highest Accuracy (Desc: -acc)
+    # 2. Fewest Features (Asc: length)
+    # 3. Alphabetical determinism (Asc: string sorting)
+    all_results.sort(key=lambda x: (-x[0], x[1], x[2]))
+    top_3 = all_results[:3]
+
     print("-" * 40)
-    print(f"Highest Out-of-Sample Accuracy: {best_acc:.4f}")
-    print(f"Optimal Features: {list(best_features)}")
+    print("Top 3 Feature Combinations Analysis:")
+    for i, res in enumerate(top_3, 1):
+        print(f"Rank {i} | Accuracy: {res[0]:.4f}")
+        print(f"Features: {list(res[3])}\n")
     
     output_data = {
         "ticker": args.ticker,
         "exchange": args.exchange,
-        "best_accuracy": best_acc,
-        "best_features": list(best_features),
-        "dataset_rows": best_rows,
-        "out_of_sample_size": best_test_size
+        "top_combinations": [
+            {
+                "rank": i,
+                "accuracy": round(res[0], 4),
+                "features": list(res[3]),
+                "dataset_rows": res[4],
+                "out_of_sample_size": res[5]
+            } for i, res in enumerate(top_3, 1)
+        ]
     }
     
     os.makedirs("optimal_features", exist_ok=True)

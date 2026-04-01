@@ -1,15 +1,44 @@
 {
     "ticker": "CENTRALBK",
     "exchange": "NSE",
-    "best_accuracy": 0.6354166666666666,
-    "best_features": [
-        "Closing_Momentum",
-        "Distance_to_Fast_SMA",
-        "Daily_RSI_14",
-        "VWAP_Distance",
-        "OFI",
-        "Frac_Diff_Close",
-        "Nifty_Trend_Dist"
-    ],
-    "dataset_rows": 476
+    "top_combinations": [
+        {
+            "rank": 1,
+            "accuracy": 0.625,
+            "features": [
+                "Daily_RSI_14",
+                "OFI",
+                "Nifty_Trend_Dist",
+                "Morning_Autocorr"
+            ],
+            "dataset_rows": 476,
+            "out_of_sample_size": 96
+        },
+        {
+            "rank": 2,
+            "accuracy": 0.625,
+            "features": [
+                "ATR_Percent",
+                "OFI",
+                "Nifty_RSI_14",
+                "Nifty_Trend_Dist",
+                "Morning_Autocorr"
+            ],
+            "dataset_rows": 476,
+            "out_of_sample_size": 96
+        },
+        {
+            "rank": 3,
+            "accuracy": 0.625,
+            "features": [
+                "Distance_to_Fast_SMA",
+                "Daily_RSI_14",
+                "OFI",
+                "Nifty_Trend_Dist",
+                "Morning_Autocorr"
+            ],
+            "dataset_rows": 476,
+            "out_of_sample_size": 96
+        }
+    ]
 }

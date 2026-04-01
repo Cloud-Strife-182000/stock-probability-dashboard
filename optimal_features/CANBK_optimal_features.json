@@ -1,23 +1,27 @@
 {
-    "ticker": "BANKINDIA",
+    "ticker": "CANBK",
     "exchange": "NSE",
     "top_combinations": [
         {
             "rank": 1,
-            "accuracy": 0.625,
+            "accuracy": 0.6562,
             "features": [
-                "Daily_RSI_14"
+                "Closing_Momentum",
+                "Closing_Volume_Surge",
+                "Distance_to_Fast_SMA",
+                "Daily_RSI_14",
+                "Nifty_RSI_14",
+                "US_Overnight_Return"
             ],
             "dataset_rows": 477,
             "out_of_sample_size": 96
         },
         {
             "rank": 2,
-            "accuracy": 0.625,
+            "accuracy": 0.6458,
             "features": [
-                "Closing_Volume_Surge",
+                "Closing_Momentum",
                 "Distance_to_Fast_SMA",
-                "ATR_Percent",
                 "Daily_RSI_14"
             ],
             "dataset_rows": 477,
@@ -25,15 +29,12 @@
         },
         {
             "rank": 3,
-            "accuracy": 0.625,
+            "accuracy": 0.6458,
             "features": [
                 "Closing_Momentum",
+                "Closing_Volume_Surge",
                 "Distance_to_Fast_SMA",
-                "ATR_Percent",
-                "Daily_RSI_14",
-                "VWAP_Distance",
-                "OFI",
-                "Nifty_Trend_Dist"
+                "US_Overnight_Return"
             ],
             "dataset_rows": 477,
             "out_of_sample_size": 96

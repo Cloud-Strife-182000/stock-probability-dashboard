@@ -1,13 +1,42 @@
 {
     "ticker": "REDINGTON",
     "exchange": "NSE",
-    "best_accuracy": 0.7083333333333334,
-    "best_features": [
-        "Distance_to_Fast_SMA",
-        "ATR_Percent",
-        "OFI",
-        "Morning_Autocorr"
-    ],
-    "dataset_rows": 476,
-    "out_of_sample_size": 96
+    "top_combinations": [
+        {
+            "rank": 1,
+            "accuracy": 0.7083,
+            "features": [
+                "Distance_to_Fast_SMA",
+                "ATR_Percent",
+                "OFI",
+                "Morning_Autocorr"
+            ],
+            "dataset_rows": 476,
+            "out_of_sample_size": 96
+        },
+        {
+            "rank": 2,
+            "accuracy": 0.7083,
+            "features": [
+                "Closing_Volume_Surge",
+                "Distance_to_Fast_SMA",
+                "OFI",
+                "Frac_Diff_Close"
+            ],
+            "dataset_rows": 477,
+            "out_of_sample_size": 96
+        },
+        {
+            "rank": 3,
+            "accuracy": 0.6979,
+            "features": [
+                "Distance_to_Fast_SMA",
+                "Daily_RSI_14",
+                "OFI",
+                "Frac_Diff_Close"
+            ],
+            "dataset_rows": 477,
+            "out_of_sample_size": 96
+        }
+    ]
 }

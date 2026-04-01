@@ -1,15 +1,41 @@
 {
     "ticker": "PNB",
     "exchange": "NSE",
-    "best_accuracy": 0.625,
-    "best_features": [
-        "Closing_Momentum",
-        "VWAP_Distance",
-        "OFI",
-        "Frac_Diff_Close",
-        "Nifty_RSI_14",
-        "Nifty_Trend_Dist"
-    ],
-    "dataset_rows": 477,
-    "out_of_sample_size": 96
+    "top_combinations": [
+        {
+            "rank": 1,
+            "accuracy": 0.625,
+            "features": [
+                "Closing_Momentum",
+                "VWAP_Distance",
+                "OFI",
+                "Frac_Diff_Close",
+                "Nifty_RSI_14",
+                "Nifty_Trend_Dist"
+            ],
+            "dataset_rows": 477,
+            "out_of_sample_size": 96
+        },
+        {
+            "rank": 2,
+            "accuracy": 0.6146,
+            "features": [
+                "ATR_Percent",
+                "OFI"
+            ],
+            "dataset_rows": 477,
+            "out_of_sample_size": 96
+        },
+        {
+            "rank": 3,
+            "accuracy": 0.6146,
+            "features": [
+                "ATR_Percent",
+                "OFI",
+                "Nifty_Momentum"
+            ],
+            "dataset_rows": 477,
+            "out_of_sample_size": 96
+        }
+    ]
 }
