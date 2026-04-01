@@ -428,19 +428,27 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                     # from the training set to avoid data leakage!
                     if last_x_target_date == today_ist_str:
                         model.fit(X.iloc[:-1], y.iloc[:-1])
+                        training_end_date = ml_df.iloc[-2]['DateStr'] if len(ml_df) > 1 else ml_df.iloc[-1]['DateStr']
                     else:
                         model.fit(X, y)
+                        training_end_date = ml_df.iloc[-1]['DateStr']
                     
                     available_dates = list(df['DateStr'].unique())
                     feature_day_str = available_dates[-2] if len(available_dates) > 1 else available_dates[-1]
                     today_features = df[df['DateStr'] == feature_day_str].tail(1)[selected_features].astype(float)
                     st.session_state['forecast_type'] = "Current Day"
+                    st.session_state['feature_day_str'] = feature_day_str
+                    st.session_state['training_end_day_str'] = training_end_date
                 else:
                     # Market is closed (>= 4PM). Predict for TOMORROW using TODAY's data.
                     model.fit(X, y)
+                    training_end_date = ml_df.iloc[-1]['DateStr']
                     
+                    feature_day_str = df.groupby('DateStr').tail(1).iloc[-1]['DateStr']
                     today_features = df.groupby('DateStr').tail(1).iloc[-1][selected_features].to_frame().T.astype(float)
                     st.session_state['forecast_type'] = "Next Day"
+                    st.session_state['feature_day_str'] = feature_day_str
+                    st.session_state['training_end_day_str'] = training_end_date
 
                 if not today_features.isna().any().any():
                     prob_array = model.predict_proba(today_features)[0]
@@ -643,10 +651,16 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                         display_df = display_df.set_index('DateStr')
                         st.dataframe(display_df, use_container_width=True)
                     
-                    with st.expander("🔍 View Today's Feature Snapshot (Prediction Input)", expanded=False):
-                        snapshot_date_str = df['DateStr'].iloc[-1]
-                        snapshot_day = pd.to_datetime(snapshot_date_str).strftime('%A, %d %b %Y')
-                        st.markdown(f"This is the **single feature row** the model used to generate today's forecast. All values are sourced from the most recent available session: **{snapshot_day}**")
+                    with st.expander("🔍 View Feature Snapshot (Prediction Input)", expanded=False):
+                        feat_day_str = st.session_state.get('feature_day_str', df['DateStr'].iloc[-1])
+                        train_end_str = st.session_state.get('training_end_day_str', df['DateStr'].iloc[-1])
+                        
+                        feat_day = pd.to_datetime(feat_day_str).strftime('%A, %d %b %Y')
+                        train_end_day = pd.to_datetime(train_end_str).strftime('%A, %d %b %Y')
+                        
+                        st.markdown(f"**Training Data End:** The model was trained aggressively on all valid historical data strictly up to **{train_end_day}**.")
+                        st.markdown(f"**Feature Snapshot Date:** This is the **single feature row** sourced directly from the session on **{feat_day}** to generate the forecast above.")
+                        
                         if today_features is not None and not today_features.empty:
                             snapshot_df = today_features.copy()
                             snapshot_df.index = [st.session_state.get('last_ticker', symbol)]
