@@ -272,12 +272,6 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
             market_open = pd.Timestamp.today(tz='Asia/Kolkata').hour < 16
             
             for date_str, group in df.groupby('DateStr'):
-                # Do not compute today's target while the market is still open.
-                # We are currently predicting for the current session, so including
-                # today's 10:15 AM outcome would contaminate the training set.
-                if market_open and date_str == today_ist_str:
-                    continue
-                
                 group = group.sort_values(by='DatetimeObj')
                 
                 # Explicitly look up the 9:15 AM candle (market open) and 10:15 AM candle
@@ -300,9 +294,9 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
             ml_df = df.groupby('DateStr').tail(1).copy()
             
             date_to_next_date = {}
-            dates = sorted(list(daily_targets.keys()))
-            for i in range(len(dates) - 1):
-                date_to_next_date[dates[i]] = dates[i+1]
+            all_trading_dates = sorted(list(df['DateStr'].unique()))
+            for i in range(len(all_trading_dates) - 1):
+                date_to_next_date[all_trading_dates[i]] = all_trading_dates[i+1]
                 
             def map_target(row):
                 next_date = date_to_next_date.get(row['DateStr'])
@@ -372,7 +366,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                 eval_results = []
                 
                 if lookback_days > 0:
-                    start_idx = 2 if is_current_day_live else 1
+                    start_idx = 1
                     end_idx = lookback_days + start_idx
                     max_available = len(X) - 1
                     
@@ -415,14 +409,21 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                 model = clone(base_ensemble)
                 
                 today_ist = pd.Timestamp.today(tz='Asia/Kolkata')
+                today_ist_str = today_ist.strftime('%Y-%m-%d')
                 last_df_date_str = df['DateStr'].iloc[-1]
                 
-                if today_ist.hour < 16 and last_df_date_str == today_ist.strftime('%Y-%m-%d'):
+                if today_ist.hour < 16 and last_df_date_str == today_ist_str:
                     # Market is still open. Predict for TODAY using YESTERDAY's data.
-                    # CRITICAL: Since today's 10:15 close exists in the dataset, yesterday's row in X 
-                    # now contains today's true target. To prevent data leakage, we must exclude the 
-                    # final row of X from the training set when generating the 'Current Day' prediction!
-                    model.fit(X.iloc[:-1], y.iloc[:-1])
+                    last_x_date = ml_df.iloc[-1]['DateStr']
+                    last_x_target_date = date_to_next_date.get(last_x_date, "")
+                    
+                    # If today's 10:15 close exists in the dataset and was assigned as a target,
+                    # the final row in X holds today's true target. We must exclude it
+                    # from the training set to avoid data leakage!
+                    if last_x_target_date == today_ist_str:
+                        model.fit(X.iloc[:-1], y.iloc[:-1])
+                    else:
+                        model.fit(X, y)
                     
                     available_dates = list(df['DateStr'].unique())
                     feature_day_str = available_dates[-2] if len(available_dates) > 1 else available_dates[-1]
