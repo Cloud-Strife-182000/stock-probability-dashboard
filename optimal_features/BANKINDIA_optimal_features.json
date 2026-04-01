@@ -1,0 +1,9 @@
+{
+    "ticker": "BANKINDIA",
+    "exchange": "NSE",
+    "best_accuracy": 0.6354166666666666,
+    "best_features": [
+        "Daily_RSI_14"
+    ],
+    "dataset_rows": 476
+}

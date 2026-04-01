@@ -1,0 +1,10 @@
+{
+    "ticker": "PNB",
+    "exchange": "NSE",
+    "best_accuracy": 0.6354166666666666,
+    "best_features": [
+        "ATR_Percent",
+        "OFI"
+    ],
+    "dataset_rows": 477
+}

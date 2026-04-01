@@ -1,0 +1,15 @@
+{
+    "ticker": "CENTRALBK",
+    "exchange": "NSE",
+    "best_accuracy": 0.6354166666666666,
+    "best_features": [
+        "Closing_Momentum",
+        "Distance_to_Fast_SMA",
+        "Daily_RSI_14",
+        "VWAP_Distance",
+        "OFI",
+        "Frac_Diff_Close",
+        "Nifty_Trend_Dist"
+    ],
+    "dataset_rows": 476
+}
