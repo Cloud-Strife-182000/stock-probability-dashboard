@@ -1,27 +1,48 @@
 # 📈 Stock Probability Dashboard
 
-A powerful, interactive Streamlit application configured to dynamically fetch live Indian stock market data and apply a deep Machine Learning predictive ensemble tracking intraday asset momentum.
+A powerful, interactive Streamlit application configured to dynamically fetch live Indian stock market data and apply a predictive Random Forest machine learning model to track intraday asset momentum. This repository also includes an exhaustive brute-force feature selection script to optimize prediction accuracy.
 
-## Core Architecture & Machine Learning Features
+## Core Architecture & Features
 
-- **Sustained 730-Day Hourly Engine:** The system deliberately bypasses superficial daily scopes natively extracting the maximum `730-day` API boundaries across `1-hour` limits, structurally parsing exactly the ultimate timeline directly from `yfinance`.
-- **Timezone-Agnostic Target Engineering:** Drops static timeframe limits dynamically extracting `iloc[0]` and `iloc[1]` strictly evaluating the structural opening hour volatility explicitly scaling targets using a dynamically mapped `<0.15 * Daily_ATR>` resistance hurdle.
-- **Heterogeneous Voting Classifier:** Overhauled simple singular Machine Learning models actively integrating a complex tri-factor **Soft-Voting Ensemble:**
-  - **Random Forest:** Deploys deep cyclical logic natively protected via `max_depth=None` and `min_samples_leaf=15` checking broad trends over multi-year bounds against explicit `class_weight='balanced'` ratios preventing structural drift.
-  - **XGBoost:** Deploys strict structural gradient boosting (`max_depth=3`, `learning_rate=0.05`, `n_jobs=1`) safely decoding `LabelEncoder` matrices organically hunting localized momentum sequences heavily protecting against Streamlit OpenMP deadlocks.
-  - **Logistic Regression:** Operates fundamentally inside a standardized `Pipeline` explicitly providing equally weighted baseline linear probability regression curves natively tracking historical structures perfectly safely.
-- **5-Day Walk Forward Validation Engine:** A strictly governed historical validation block automatically parsing `5` dynamic out-of-sample prediction checks. The sequence physically isolates clones, entirely preventing futuristic data leakage sequentially testing reverse memory correctly printing literal chronological logic results out on the user grid.
-- **Dynamic Excel Ledger Watchlist:** Automatically serializes explicit probability configurations organically directly matching the user's localized custom Watchlist structurally updating `.xlsx` sheets formatting tracking outputs (including True Edge `%`, Baseline Outperforms naturally decoding `"Regime Sync X/5"`) safely.
+- **Sustained 730-Day Hourly Engine:** The system extracts up to 2 years of 1-hour interval data directly from `yfinance`, explicitly targeting the 9:15 AM to 10:15 AM morning session to capture structural opening hour momentum bounds.
+- **Dynamic Feature Selection UI:** Users can interactively toggle 13 distinct technical and macro features (such as Order Flow Imbalance, VWAP Distance, Fractional Differencing, NIFTY 50 macro trends, and S&P 500 overnight sentiment) to instantly re-train the Random Forest model directly within the Streamlit interface.
+- **Macroscopic Indicator Merging:** Integrates broad market indices (`^NSEI` for local sentiment and `^GSPC` for overnight US sentiment) to inform the predictive matrix with external risk-on/risk-off regimes.
+- **Random Forest Ensemble:** Utilizes a robust `RandomForestClassifier` (`n_estimators=100`, class balancing, and leaf regulations) to predict binary outcomes for targeted intraday thresholds without overfitting simple sequences.
+- **5-Day Walk Forward Validation Engine:** A strictly governed historical validation block that automatically runs 5 out-of-sample chronological prediction checks against previous session geometries, confirming the model's actual predictive synchronization locally.
+- **Batch Watchlist & Excel Export:** Allows users to upload a `.txt` batch of tickers to automatically process predictions sequentially. The generated watchlist state can then be exported cleanly as an `.xlsx` file incorporating historical performance baselines and actual accuracy edges safely.
+
+---
+
+## 🚀 The Brute-Force Feature Selector
+
+To discover the absolute strongest combination of features for any specific asset, the repository includes a standalone Python script: `brute_force_selection.py`. 
+
+Because different stocks respond differently to distinct indicators, this script systematically trains and tests all **8191 possible feature combinations** ($2^{13} - 1$) using exact replica Random Forest settings. It ensures identical dataset shapes by dropping `NaN`s uniformly up front across all potential indicators, yielding a perfectly fair, chronological `train_test_split` cross-validation comparison.
+
+**Running the Feature Selector:**
+
+```bash
+# Defaults to mapping the NSE exchange
+python brute_force_selection.py --ticker PNB
+
+# Specifying an alternate exchange
+python brute_force_selection.py --ticker RELIANCE --exchange BSE
+```
+
+**Outputs:**
+The script utilizes CPU-bound multiprocessing (`ProcessPoolExecutor`) to sprint rapidly through the matrix. Upon completion, it automatically creates a directory named `optimal_features/` and outputs a dedicated JSON configuration (e.g., `optimal_features/PNB_optimal_features.json`) detailing the optimal list of indicators generating the highest true test-set accuracy globally.
+
+---
 
 ## Installation & Setup
 
-1. Install the required data science dependencies securely explicitly bound to their updated parameters effectively managing logic correctly:
+1. Install the required data science dependencies from the root directory:
 
    ```bash
    pip install -r requirements.txt
    ```
 
-2. Boot the local dashboard directly routing natively on the designated open server:
+2. Boot the local Streamlit dashboard:
 
    ```bash
    streamlit run streamlit_app.py
@@ -29,7 +50,8 @@ A powerful, interactive Streamlit application configured to dynamically fetch li
 
 ## Built With
 
-- **[Streamlit](https://streamlit.io/):** Native execution visual UI wrapper arrays.
-- **[yfinance](https://pypi.org/project/yfinance/):** Fundamental ticker data generation bounds organically scraping arrays properly.
-- **[XGBoost](https://xgboost.readthedocs.io/) & [scikit-learn](https://scikit-learn.org/):** Core classification and machine learning parameter execution layers securely blending arrays together linearly.
-- **[pandas](https://pandas.pydata.org/):** Advanced positional arrays efficiently mapping memory correctly directly across dataframe manipulations smoothly tracking boundary targets efficiently.
+- **[Streamlit](https://streamlit.io/):** Interactive execution UI and visual component mapping.
+- **[yfinance](https://pypi.org/project/yfinance/):** Fundamental ticker data generation parsing bounds organically.
+- **[scikit-learn](https://scikit-learn.org/):** Core Random Forest execution layer handling validation matrix testing properly.
+- **[pandas](https://pandas.pydata.org/):** Advanced positional arrays tracking historical index targets natively.
+- **[pandas-ta-classic](https://github.com/twopirllc/pandas-ta):** Technical analysis computations accurately calculating structural geometries.
