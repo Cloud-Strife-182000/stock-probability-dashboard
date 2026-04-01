@@ -59,6 +59,26 @@ def fetch_nifty_data():
     except Exception:
         return pd.DataFrame()
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_global_sentiment_data():
+    """Fetch S&P 500 (^GSPC) daily data for global overnight sentiment."""
+    try:
+        sp500 = yf.Ticker("^GSPC")
+        df_sp = sp500.history(period="2y", interval="1d")
+        if df_sp.empty:
+            return pd.DataFrame()
+            
+        df_sp = df_sp.reset_index()
+        df_sp['DateStr'] = pd.to_datetime(df_sp['Date']).dt.strftime('%Y-%m-%d')
+        
+        # Calculate US daily return and shift strictly forward by 1 day
+        # so Monday's US performance aligns with Tuesday's India row.
+        df_sp['US_Overnight_Return'] = df_sp['Close'].pct_change().shift(1)
+        
+        return df_sp[['DateStr', 'US_Overnight_Return']]
+    except Exception:
+        return pd.DataFrame()
+
 @st.cache_data(ttl=1800, show_spinner=False)
 def get_top_news(ticker):
     url = f"https://news.google.com/rss/search?q={ticker}+share+news&hl=en-IN&gl=IN&ceid=IN:en"
@@ -117,7 +137,8 @@ FEATURE_MAP = {
     "Nifty Momentum": 'Nifty_Momentum',
     "Nifty RSI": 'Nifty_RSI_14',
     "Nifty Trend": 'Nifty_Trend_Dist',
-    "Morning Autocorr": 'Morning_Autocorr'
+    "Morning Autocorr": 'Morning_Autocorr',
+    "US Overnight Ret": 'US_Overnight_Return'
 }
 
 # Initial setup for persistence of engine features
@@ -208,6 +229,13 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                 for col in ['Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']:
                     if col in df_1d.columns:
                         df_1d[col] = df_1d[col].ffill()
+                        
+            # 1.6 MERGE US OVERNIGHT DATA
+            sp_df = fetch_global_sentiment_data()
+            if not sp_df.empty:
+                df_1d = pd.merge(df_1d, sp_df, on='DateStr', how='left')
+                if 'US_Overnight_Return' in df_1d.columns:
+                    df_1d['US_Overnight_Return'] = df_1d['US_Overnight_Return'].ffill()
                 
             # 2. PROCESS 1h DATA
             df = data_1h.copy() # Changed data_15m to data_1h
@@ -232,7 +260,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
             
             # 3. MERGE DAILY DATA
             # 3. MERGE DAILY DATA (Stock + NIFTY Macro)
-            daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']
+            daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
             merge_cols = [c for c in daily_cols if c in df_1d.columns]
             daily_subset = df_1d[merge_cols].dropna()
             df = pd.merge(df, daily_subset, on='DateStr', how='left')
