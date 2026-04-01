@@ -266,9 +266,20 @@ if __name__ == "__main__":
         
         for future in concurrent.futures.as_completed(futures):
             combo, acc = future.result()
+            
+            # Using strict deterministic conditions to handle exact ties in accuracy 
+            # (which otherwise return non-deterministically due to multiprocessing completion speed)
             if acc > best_acc:
                 best_acc = acc
                 best_features = combo
+            elif acc == best_acc and best_features is not None:
+                # Tie-breaker 1: Prefer fewer features (simpler model)
+                if len(combo) < len(best_features):
+                    best_features = combo
+                # Tie-breaker 2: If same number of features, sort alphabetically for exact determinism
+                elif len(combo) == len(best_features):
+                    if sorted(list(combo)) < sorted(list(best_features)):
+                        best_features = combo
                 
             completed += 1
             if completed % 500 == 0 or completed == total_combinations:

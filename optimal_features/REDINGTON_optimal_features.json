@@ -1,12 +1,13 @@
 {
     "ticker": "REDINGTON",
     "exchange": "NSE",
-    "best_accuracy": 0.75,
+    "best_accuracy": 0.7083333333333334,
     "best_features": [
         "Distance_to_Fast_SMA",
         "ATR_Percent",
         "OFI",
         "Morning_Autocorr"
     ],
-    "dataset_rows": 477
+    "dataset_rows": 476,
+    "out_of_sample_size": 96
 }
