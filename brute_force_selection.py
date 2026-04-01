@@ -211,19 +211,28 @@ def prepare_data(ticker, exchange):
         
     ml_df['Target'] = ml_df.apply(map_target, axis=1)
     
-    # Drop NAs uniformly across all potential features to maintain exact dataset shape for fairness
-    ml_df = ml_df.dropna(subset=ALL_FEATURES + ['Target'])
+    # DO NOT drop NAs globally. The dashboard strictly drops NAs dynamically based ONLY on the actual selected features.
     return ml_df
 
 def evaluate_combination(args):
-    feature_combo, ml_df_subset, y_series = args
-    X = ml_df_subset[list(feature_combo)]
+    feature_combo, ml_df = args
+    combo_list = list(feature_combo)
+    
+    # Drop NAs dynamically just for this specific feature combination
+    ml_df_subset = ml_df.dropna(subset=combo_list + ['Target'])
+    
+    if len(ml_df_subset) < 10:
+        return feature_combo, 0.0, 0, 0
+        
+    X = ml_df_subset[combo_list]
+    y_series = ml_df_subset['Target']
     X_train, X_test, y_train, y_test = train_test_split(X, y_series, test_size=0.2, shuffle=False)
     
     model = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_leaf=15, class_weight='balanced', random_state=42)
     model.fit(X_train, y_train)
     acc = model.score(X_test, y_test)
-    return feature_combo, acc
+    
+    return feature_combo, acc, len(ml_df_subset), len(y_test)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Brute Force Feature Selection for Stock Prediction")
@@ -239,10 +248,10 @@ if __name__ == "__main__":
         sys.exit(1)
     
     if len(ml_df) < 10:
-        print("Not enough data to train the model after dropping NaNs.")
+        print("Not enough raw data to train the model.")
         sys.exit(1)
         
-    print(f"Dataset prepared. Total rows for ML: {len(ml_df)}")
+    print(f"Dataset prepared. Total raw rows available: {len(ml_df)}")
     
     # Generate all combinations
     all_combinations = []
@@ -254,32 +263,38 @@ if __name__ == "__main__":
     
     best_acc = 0.0
     best_features = None
+    best_rows = 0
+    best_test_size = 0
     
     completed = 0
     start_time = time.time()
     
-    y = ml_df['Target']
-    
     # Use multiprocessing to speed up Random Forest training grid
     with concurrent.futures.ProcessPoolExecutor() as executor:
-        futures = {executor.submit(evaluate_combination, (combo, ml_df, y)): combo for combo in all_combinations}
+        futures = {executor.submit(evaluate_combination, (combo, ml_df)): combo for combo in all_combinations}
         
         for future in concurrent.futures.as_completed(futures):
-            combo, acc = future.result()
+            combo, acc, c_rows, c_test_size = future.result()
             
             # Using strict deterministic conditions to handle exact ties in accuracy 
             # (which otherwise return non-deterministically due to multiprocessing completion speed)
             if acc > best_acc:
                 best_acc = acc
                 best_features = combo
+                best_rows = c_rows
+                best_test_size = c_test_size
             elif acc == best_acc and best_features is not None:
                 # Tie-breaker 1: Prefer fewer features (simpler model)
                 if len(combo) < len(best_features):
                     best_features = combo
+                    best_rows = c_rows
+                    best_test_size = c_test_size
                 # Tie-breaker 2: If same number of features, sort alphabetically for exact determinism
                 elif len(combo) == len(best_features):
                     if sorted(list(combo)) < sorted(list(best_features)):
                         best_features = combo
+                        best_rows = c_rows
+                        best_test_size = c_test_size
                 
             completed += 1
             if completed % 500 == 0 or completed == total_combinations:
@@ -290,16 +305,13 @@ if __name__ == "__main__":
     print(f"Highest Out-of-Sample Accuracy: {best_acc:.4f}")
     print(f"Optimal Features: {list(best_features)}")
     
-    _, X_test_example, _, _ = train_test_split(ml_df, y, test_size=0.2, shuffle=False)
-    out_of_sample_size = len(X_test_example)
-    
     output_data = {
         "ticker": args.ticker,
         "exchange": args.exchange,
         "best_accuracy": best_acc,
         "best_features": list(best_features),
-        "dataset_rows": len(ml_df),
-        "out_of_sample_size": out_of_sample_size
+        "dataset_rows": best_rows,
+        "out_of_sample_size": best_test_size
     }
     
     os.makedirs("optimal_features", exist_ok=True)
