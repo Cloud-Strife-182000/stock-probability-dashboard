@@ -367,6 +367,12 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                 
                 if lookback_days > 0:
                     start_idx = 1
+                    
+                    last_x_target_date_wf = date_to_next_date.get(ml_df.iloc[-1]['DateStr'], "")
+                    if is_current_day_live and last_x_target_date_wf == today_ist_wf.strftime('%Y-%m-%d'):
+                        # Skip validating the current active day to hide leakage on the UI
+                        start_idx = 2
+                        
                     end_idx = lookback_days + start_idx
                     max_available = len(X) - 1
                     
