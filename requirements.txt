@@ -8,3 +8,5 @@ scikit-learn
 typing-extensions>=4.6.0
 pandas-ta-classic
 openpyxl
+requests>=2.28.0
+beautifulsoup4>=4.11.0

@@ -98,6 +98,40 @@ def get_top_news(ticker):
     except Exception as e:
         return []
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_munafasutra_prediction(ticker):
+    """Fetch predictive text from MunafaSutra."""
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+        base_ticker = ticker.replace('.NS', '').replace('.BO', '').replace('.BS', '')
+        url = f"https://munafasutra.com/nse/tomorrow/{base_ticker}"
+        
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+        resp = requests.get(url, headers=headers, timeout=5)
+        
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            paragraphs = soup.find_all('p')
+            prediction_text = ""
+            
+            for p in paragraphs:
+                txt = p.get_text(strip=True)
+                # Filter out garbage tags or short UI strings, looking for actual analysis paragraphs
+                if len(txt) > 80 and "AdBlock" not in txt and "MunafaSutra" not in txt:
+                    prediction_text += txt + "\n\n"
+                    if len(prediction_text) > 1000:
+                        prediction_text = prediction_text[:1000] + "..."
+                        break
+            
+            if prediction_text:
+                return prediction_text.strip()
+            return "No readable prediction paragraphs available on MunafaSutra."
+        else:
+            return f"Failed to fetch data (Status Code: {resp.status_code})"
+    except Exception as e:
+        return f"Error fetching MunafaSutra prediction: {e}"
+
 def frac_diff_ffd(series, d=0.4, thresh=1e-5):
     """Fixed-Width Window Fractional Differencing (Lopez de Prado)."""
     w = [1.0]
@@ -714,6 +748,11 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                         """, unsafe_allow_html=True)
                 else:
                     st.markdown("<p style='color: #888;'>No recent news articles found for this ticker.</p>", unsafe_allow_html=True)
+            
+            with st.expander(f"🔮 View Munafa Sutra Prediction for {symbol}", expanded=False):
+                with st.spinner("Fetching prediction from Munafa Sutra..."):
+                    munafa_pred = fetch_munafasutra_prediction(ticker_input).replace('\\n', '<br>')
+                    st.markdown(f"<div style='padding:1rem; border-radius:8px; background-color:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05);'><p style='color: #DDD; font-size: 1rem; line-height: 1.6;'>{munafa_pred}</p></div>", unsafe_allow_html=True)
             
         except Exception as e:
             if render_ui:
