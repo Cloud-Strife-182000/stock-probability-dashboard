@@ -224,8 +224,8 @@ def evaluate_combination(args):
     if len(ml_df_subset) < 10:
         return feature_combo, 0.0, 0, 0
         
-    X = ml_df_subset[combo_list]
-    y_series = ml_df_subset['Target']
+    X = ml_df_subset[combo_list].astype(float)
+    y_series = ml_df_subset['Target'].astype(float)
     X_train, X_test, y_train, y_test = train_test_split(X, y_series, test_size=0.2, shuffle=False)
     
     model = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_leaf=15, class_weight='balanced', random_state=42)

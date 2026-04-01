@@ -1,10 +1,15 @@
 {
     "ticker": "PNB",
     "exchange": "NSE",
-    "best_accuracy": 0.65625,
+    "best_accuracy": 0.625,
     "best_features": [
-        "OFI"
+        "Closing_Momentum",
+        "VWAP_Distance",
+        "OFI",
+        "Frac_Diff_Close",
+        "Nifty_RSI_14",
+        "Nifty_Trend_Dist"
     ],
-    "dataset_rows": 476,
+    "dataset_rows": 477,
     "out_of_sample_size": 96
 }
