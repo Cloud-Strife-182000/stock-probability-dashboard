@@ -751,8 +751,8 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
             
             with st.expander(f"🔮 View Munafa Sutra Prediction for {symbol}", expanded=False):
                 with st.spinner("Fetching prediction from Munafa Sutra..."):
-                    munafa_pred = fetch_munafasutra_prediction(ticker_input).replace('\\n', '<br>')
-                    st.markdown(f"<div style='padding:1rem; border-radius:8px; background-color:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05);'><p style='color: #DDD; font-size: 1rem; line-height: 1.6;'>{munafa_pred}</p></div>", unsafe_allow_html=True)
+                    munafa_pred = fetch_munafasutra_prediction(ticker_input).replace('\n', '<br>')
+                    st.markdown(f"<div style='padding:1rem; border-radius:8px; background-color:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05);'><p style='color: black; font-size: 1rem; line-height: 1.6;'>{munafa_pred}</p></div>", unsafe_allow_html=True)
             
         except Exception as e:
             if render_ui:
