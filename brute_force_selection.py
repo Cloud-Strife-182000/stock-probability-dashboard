@@ -237,25 +237,19 @@ def evaluate_combination(args):
     
     return feature_combo, acc, len(ml_df_subset), len(y_test)
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Brute Force Feature Selection for Stock Prediction")
-    parser.add_argument("--ticker", required=True, help="Stock ticker symbol (e.g. PNB, BANKINDIA)")
-    parser.add_argument("--exchange", default="NSE", choices=["NSE", "BSE"], help="Exchange (NSE or BSE)")
-    
-    args = parser.parse_args()
-    
+def process_ticker(ticker, exchange):
     try:
-        ml_df = prepare_data(args.ticker, args.exchange)
+        ml_df = prepare_data(ticker, exchange)
     except Exception as e:
-        print(f"Error fetching data: {e}")
-        sys.exit(1)
+        print(f"Error fetching data for {ticker}: {e}")
+        return
     
     if len(ml_df) < 10:
-        print("Not enough raw data to train the model.")
-        sys.exit(1)
+        print(f"Not enough raw data to train the model for {ticker}.")
+        return
         
     last_valid_date = ml_df.iloc[-1]['DateStr']
-    print(f"Dataset prepared. Total raw valid rows available: {len(ml_df)} | Last Valid Training Date: {last_valid_date}")
+    print(f"Dataset prepared for {ticker}. Total raw valid rows available: {len(ml_df)} | Last Valid Training Date: {last_valid_date}")
     
     # Generate all combinations
     all_combinations = []
@@ -263,7 +257,7 @@ if __name__ == "__main__":
         all_combinations.extend(list(itertools.combinations(ALL_FEATURES, r)))
         
     total_combinations = len(all_combinations)
-    print(f"Total combinations to test: {total_combinations}")
+    print(f"Total combinations to test for {ticker}: {total_combinations}")
     
     all_results = []
     best_acc = 0.0
@@ -285,7 +279,7 @@ if __name__ == "__main__":
             completed += 1
             if completed % 500 == 0 or completed == total_combinations:
                 elapsed = time.time() - start_time
-                print(f"Processed {completed}/{total_combinations} | Best Acc: {best_acc:.4f} | Time: {elapsed:.1f}s")
+                print(f"[{ticker}] Processed {completed}/{total_combinations} | Best Acc: {best_acc:.4f} | Time: {elapsed:.1f}s")
 
     # Tie-breaker deterministic sorting:
     # 1. Highest Accuracy (Desc: -acc)
@@ -295,14 +289,14 @@ if __name__ == "__main__":
     top_3 = all_results[:3]
 
     print("-" * 40)
-    print("Top 3 Feature Combinations Analysis:")
+    print(f"Top 3 Feature Combinations Analysis for {ticker}:")
     for i, res in enumerate(top_3, 1):
         print(f"Rank {i} | Accuracy: {res[0]:.4f}")
         print(f"Features: {list(res[3])}\n")
     
     output_data = {
-        "ticker": args.ticker,
-        "exchange": args.exchange,
+        "ticker": ticker,
+        "exchange": exchange,
         "top_combinations": [
             {
                 "rank": i,
@@ -315,8 +309,37 @@ if __name__ == "__main__":
     }
     
     os.makedirs("optimal_features", exist_ok=True)
-    output_filename = os.path.join("optimal_features", f"{args.ticker}_optimal_features.json")
+    output_filename = os.path.join("optimal_features", f"{ticker}_optimal_features.json")
     with open(output_filename, 'w') as f:
         json.dump(output_data, f, indent=4)
         
     print(f"Results saved to {output_filename}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Brute Force Feature Selection for Stock Prediction")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--ticker", help="Single stock ticker symbol (e.g. PNB, BANKINDIA)")
+    group.add_argument("--ticker_file", help="Path to a text file containing one ticker per line")
+    
+    parser.add_argument("--exchange", default="NSE", choices=["NSE", "BSE"], help="Exchange (NSE or BSE)")
+    
+    args = parser.parse_args()
+    
+    if args.ticker_file:
+        try:
+            with open(args.ticker_file, 'r') as f:
+                tickers = [line.strip().upper() for line in f if line.strip()]
+            print(f"Loaded {len(tickers)} tickers from {args.ticker_file}")
+        except Exception as e:
+            print(f"Error reading ticker file: {e}")
+            sys.exit(1)
+    else:
+        tickers = [args.ticker.strip().upper()]
+        
+    for i, current_ticker in enumerate(tickers):
+        print(f"\n{'='*60}")
+        print(f"Processing Ticker {i+1}/{len(tickers)}: {current_ticker}")
+        print(f"{'='*60}\n")
+        process_ticker(current_ticker, args.exchange)
+
