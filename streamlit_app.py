@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 import io
 import datetime
 import time
+import json
 from contextlib import nullcontext
 
 from sklearn.ensemble import RandomForestClassifier
@@ -225,6 +226,273 @@ selected_features = st.session_state['confirmed_features']
 if 'watchlist' not in st.session_state:
     st.session_state['watchlist'] = {}
 
+
+def evaluate_custom_features(ticker_input, exchange, selected_features):
+    try:
+        data_1d, data_1h, symbol = fetch_stock_data(ticker_input, exchange)
+        if data_1d.empty or data_1h.empty:
+            return None
+        
+        df_1d = data_1d.copy()
+        if isinstance(df_1d.columns, pd.MultiIndex):
+            df_1d.columns = [col[0] if isinstance(col, tuple) else col for col in df_1d.columns]
+        df_1d = df_1d.reset_index()
+        
+        if 'Date' in df_1d.columns:
+            df_1d['DateStr'] = pd.to_datetime(df_1d['Date']).dt.strftime('%Y-%m-%d')
+        elif 'Datetime' in df_1d.columns:
+            df_1d['DateStr'] = pd.to_datetime(df_1d['Datetime']).dt.strftime('%Y-%m-%d')
+            
+        if 'Close' in df_1d.columns and len(df_1d) >= 14:
+            df_1d['Daily_SMA_5'] = df_1d['Close'].rolling(window=5).mean()
+            df_1d['Daily_ATR_14'] = df_1d.ta.atr(length=14)
+            df_1d['Daily_RSI_14'] = df_1d.ta.rsi(length=14)
+            
+        nifty_df = fetch_nifty_data()
+        if not nifty_df.empty:
+            df_1d = pd.merge(df_1d, nifty_df, on='DateStr', how='left')
+            for col in ['Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']:
+                if col in df_1d.columns:
+                    df_1d[col] = df_1d[col].ffill()
+                    
+        sp_df = fetch_global_sentiment_data()
+        if not sp_df.empty:
+            df_1d = pd.merge(df_1d, sp_df, on='DateStr', how='left')
+            if 'US_Overnight_Return' in df_1d.columns:
+                df_1d['US_Overnight_Return'] = df_1d['US_Overnight_Return'].ffill()
+                
+        df = data_1h.copy()
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns]
+        df = df.reset_index()
+        
+        dt_col = 'Datetime' if 'Datetime' in df.columns else 'Date'
+        df['DatetimeObj'] = pd.to_datetime(df[dt_col])
+        
+        if df['DatetimeObj'].dt.tz is not None:
+            df['DatetimeObj'] = df['DatetimeObj'].dt.tz_convert('Asia/Kolkata')
+        else:
+            df['DatetimeObj'] = df['DatetimeObj'].dt.tz_localize('Asia/Kolkata')
+            
+        df['DateStr'] = df['DatetimeObj'].dt.strftime('%Y-%m-%d')
+        df['TimeStr'] = df['DatetimeObj'].dt.strftime('%H:%M')
+        
+        df['Closing_Momentum'] = (df['Close'] - df['Open']) / df['Open']
+        df['Closing_Volume_Surge'] = df['Volume'] / df['Volume'].rolling(window=35, min_periods=5).mean()
+        
+        daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
+        merge_cols = [c for c in daily_cols if c in df_1d.columns]
+        daily_subset = df_1d[merge_cols].dropna()
+        df = pd.merge(df, daily_subset, on='DateStr', how='left')
+        
+        for col in merge_cols:
+            if col != 'DateStr':
+                df[col] = df[col].ffill()
+        
+        df['Distance_to_Fast_SMA'] = (df['Close'] - df['Daily_SMA_5']) / df['Daily_SMA_5']
+        df['ATR_Percent'] = df['Daily_ATR_14'] / df['Close']
+        
+        df['Typical_Price'] = (df['High'] + df['Low'] + df['Close']) / 3
+        df['TP_Volume'] = df['Typical_Price'] * df['Volume']
+        df['Cum_Vol'] = df.groupby('DateStr')['Volume'].cumsum()
+        df['Cum_TP_Vol'] = df.groupby('DateStr')['TP_Volume'].cumsum()
+        df['VWAP'] = df['Cum_TP_Vol'] / df['Cum_Vol']
+        df['VWAP_Distance'] = (df['Close'] - df['VWAP']) / df['VWAP']
+        
+        df['Frac_Diff_Close'] = frac_diff_ffd(df['Close'], d=0.4)
+        
+        df = df.sort_values(['DateStr', 'DatetimeObj'])
+        day_opens = df.groupby('DateStr')['Open'].transform('first')
+        p1015 = df[df['TimeStr'] == '10:15'].set_index('DateStr')['Close']
+        df['Morning_Autocorr'] = (df['DateStr'].map(p1015) - day_opens) / day_opens
+        
+        hl_range = df['High'] - df['Low']
+        hl_range = hl_range.replace(0, np.nan)
+        df['OFI'] = (((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / hl_range).rolling(window=5, min_periods=1).mean()
+        
+        daily_targets = {}
+        for date_str, group in df.groupby('DateStr'):
+            group = group.sort_values(by='DatetimeObj')
+            candle_915 = group[group['TimeStr'] == '09:15']
+            candle_1015 = group[group['TimeStr'] == '10:15']
+            if candle_915.empty or candle_1015.empty:
+                continue
+            open_price = candle_915.iloc[0]['Open']
+            close_price = candle_1015.iloc[0]['Close']
+            if close_price > open_price:
+                daily_targets[date_str] = 1.0
+            else:
+                daily_targets[date_str] = -1.0
+        
+        ml_df = df.groupby('DateStr').tail(1).copy()
+        
+        date_to_next_date = {}
+        all_trading_dates = sorted(list(df['DateStr'].unique()))
+        for i in range(len(all_trading_dates) - 1):
+            date_to_next_date[all_trading_dates[i]] = all_trading_dates[i+1]
+            
+        def map_target(row):
+            next_date = date_to_next_date.get(row['DateStr'])
+            if next_date and next_date in daily_targets:
+                return daily_targets[next_date]
+            return float('nan')
+            
+        ml_df['Target'] = ml_df.apply(map_target, axis=1)
+        ml_df = ml_df.dropna(subset=selected_features + ['Target'])
+        
+        prob_pct = 0.0
+        prob_long = 0.0
+        prob_short = 0.0
+        test_accuracy = 0.0
+        baseline_accuracy = 0.0
+        true_edge = 0.0
+        latest_result_html = ""
+        hist_long_pct = 0.0
+        hist_short_pct = 0.0
+        ml_pred_label = ""
+        ml_color = "#AAAAAA"
+        ml_bg_color = "rgba(128,128,128,0.05)"
+        baseline_label = "N/A"
+        y_test_len = 0
+        
+        if len(ml_df) > 10:
+            X = ml_df[selected_features].astype(float)
+            y = ml_df['Target']
+            
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
+            y_test_len = len(y_test)
+            
+            target_counts = y.value_counts(normalize=True)
+            hist_long_pct = target_counts.get(1.0, 0.0) * 100
+            hist_short_pct = target_counts.get(-1.0, 0.0) * 100
+            
+            base_ensemble = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_leaf=15, class_weight='balanced', random_state=42)
+            
+            eval_model = clone(base_ensemble)
+            eval_model.fit(X_train, y_train)
+            test_accuracy = eval_model.score(X_test, y_test)
+            
+            y_test_series = pd.Series(y_test)
+            baseline_accuracy = y_test_series.value_counts(normalize=True).max()
+            baseline_class_raw = y_test_series.value_counts(normalize=True).idxmax()
+            baseline_label = "LONG" if baseline_class_raw == 1.0 else "SHORT"
+            true_edge = test_accuracy - baseline_accuracy
+            
+            today_ist_wf = pd.Timestamp.today(tz='Asia/Kolkata')
+            last_df_date_str_wf = df['DateStr'].iloc[-1]
+            is_current_day_live = (today_ist_wf.hour < 16 and last_df_date_str_wf == today_ist_wf.strftime('%Y-%m-%d'))
+            
+            def get_amo_val(val):
+                return "LONG" if val == 1.0 else "SHORT"
+                
+            lookback_days = min(5, len(X) - 2)
+            correct_count = 0
+            eval_results = []
+            
+            if lookback_days > 0:
+                start_idx = 1
+                last_x_target_date_wf = date_to_next_date.get(ml_df.iloc[-1]['DateStr'], "")
+                if is_current_day_live and last_x_target_date_wf == today_ist_wf.strftime('%Y-%m-%d'):
+                    start_idx = 2
+                    
+                end_idx = lookback_days + start_idx
+                max_available = len(X) - 1
+                
+                for i in range(start_idx, min(end_idx, max_available + 1)):
+                    test_idx = -i
+                    eval_wf_model = clone(base_ensemble)
+                    eval_wf_model.fit(X.iloc[:test_idx], y.iloc[:test_idx])
+                    
+                    test_X = X.iloc[[test_idx]]
+                    actual_y = y.iloc[test_idx]
+                    pred_y = eval_wf_model.predict(test_X)[0]
+                    
+                    is_correct = (pred_y == actual_y)
+                    if is_correct:
+                        correct_count += 1
+                        
+                    actual_lbl = get_amo_val(actual_y)
+                    pred_lbl = get_amo_val(pred_y)
+                    
+                    feature_date = ml_df.iloc[test_idx]['DateStr']
+                    date_label = date_to_next_date.get(feature_date, feature_date)
+                    
+                    if is_correct:
+                        eval_results.append(f"<li style='margin-bottom: 4px;'><span style='color: #00C073;'>✅ {date_label}: Validated (Predicted {pred_lbl})</span></li>")
+                    else:
+                        eval_results.append(f"<li style='margin-bottom: 4px;'><span style='color: #FF2B2B;'>❌ {date_label}: Failed (Pred {pred_lbl} ≠ Act {actual_lbl})</span></li>")
+                        
+                eval_results.reverse()
+                val_count = len(eval_results)
+                latest_result_html = f"<div style='margin-bottom: 8px;'><b style='color: black;'>Recent Regime Sync: {correct_count}/{val_count} Correct</b></div>"
+                latest_result_html += f"<ul style='list-style-type: none; padding-left: 0; margin: 0; font-size: 0.95rem;'>" + "".join(eval_results) + "</ul>"
+            else:
+                latest_result_html = "<span>Not enough data for 5-Day Validation.</span>"
+            
+            model = clone(base_ensemble)
+            
+            today_ist = pd.Timestamp.today(tz='Asia/Kolkata')
+            today_ist_str = today_ist.strftime('%Y-%m-%d')
+            last_df_date_str = df['DateStr'].iloc[-1]
+            
+            if today_ist.hour < 16 and last_df_date_str == today_ist_str:
+                last_x_date = ml_df.iloc[-1]['DateStr']
+                last_x_target_date = date_to_next_date.get(last_x_date, "")
+                if last_x_target_date == today_ist_str:
+                    model.fit(X.iloc[:-1], y.iloc[:-1])
+                else:
+                    model.fit(X, y)
+                
+                available_dates = list(df['DateStr'].unique())
+                feature_day_str = available_dates[-2] if len(available_dates) > 1 else available_dates[-1]
+                today_features = df[df['DateStr'] == feature_day_str].tail(1)[selected_features].astype(float)
+            else:
+                model.fit(X, y)
+                today_features = df.groupby('DateStr').tail(1).iloc[-1][selected_features].to_frame().T.astype(float)
+
+            if not today_features.isna().any().any():
+                prob_array = model.predict_proba(today_features)[0]
+                pred_class = model.predict(today_features)[0]
+                
+                class_labels = list(model.classes_)
+                try:
+                    prob_long = prob_array[class_labels.index(1.0)] * 100 if 1.0 in class_labels else 0.0
+                    prob_short = prob_array[class_labels.index(-1.0)] * 100 if -1.0 in class_labels else 0.0
+                except ValueError:
+                    pass
+                
+                if pred_class == 1.0:
+                    ml_pred_label = "LONG AMO"
+                    ml_color = "#00C073"
+                    ml_bg_color = "rgba(0, 192, 115, 0.05)"
+                else:
+                    ml_pred_label = "SHORT AMO"
+                    ml_color = "#FF2B2B"
+                    ml_bg_color = "rgba(255, 43, 43, 0.05)"
+                    
+                prob_pct = max(prob_array) * 100
+
+        return {
+            "symbol": symbol,
+            "prob_pct": prob_pct,
+            "prob_long": prob_long,
+            "prob_short": prob_short,
+            "hist_long": hist_long_pct,
+            "hist_short": hist_short_pct,
+            "test_accuracy": test_accuracy * 100,
+            "test_samples": y_test_len,
+            "baseline_accuracy": baseline_accuracy * 100,
+            "baseline_label": baseline_label,
+            "true_edge": true_edge * 100,
+            "ml_pred_label": ml_pred_label,
+            "ml_color": ml_color,
+            "ml_bg_color": ml_bg_color,
+            "latest_result_html": latest_result_html,
+            "features_used": ", ".join([{v: k for k, v in FEATURE_MAP.items()}.get(f, f) for f in selected_features])
+        }
+    except Exception as e:
+        print(f"Error in evaluate_custom_features: {e}")
+        return None
 
 def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=True):
     ctx = st.spinner(f"Fetching data and calculating indicators for {ticker_input}...") if render_ui else nullcontext()
@@ -783,7 +1051,66 @@ with st.expander("📂 Batch Watchlist Import", expanded=False):
         else:
             st.warning("The uploaded file appears to be empty or has no valid ticker names.")
 
-tab1, tab2 = st.tabs(["📊 Main Dashboard", "⭐ Watchlist"])
+tab1, tab2, tab3 = st.tabs(["📊 Main Dashboard", "⭐ Watchlist", "🔬 Backtest JSON"])
+
+with tab3:
+    st.markdown("### 🔬 Evaluate Custom Feature Sets")
+    st.markdown("Upload a feature combination JSON file generated by the brute force search to see their respective evaluations side-by-side.")
+    
+    uploaded_file = st.file_uploader("Upload optimal_features.json", type=['json'])
+    
+    if uploaded_file is not None:
+        try:
+            data = json.load(uploaded_file)
+            j_ticker = data.get("ticker", "")
+            j_exch = data.get("exchange", "NSE")
+            j_combs = data.get("top_combinations", [])
+            
+            if not j_ticker:
+                st.error("Invalid JSON: Missing ticker")
+            else:
+                st.success(f"Successfully loaded feature analysis for **{j_ticker} ({j_exch})**.")
+                
+                for i, combo in enumerate(j_combs[:3]):
+                    rnk = combo.get("rank", i+1)
+                    feats = combo.get("features", [])
+                    
+                    st.markdown(f"<div style='margin-top: 20px; padding: 15px; border-left: 4px solid #1D4ED8; background-color: rgba(0,0,0,0.03); border-radius: 4px;'>", unsafe_allow_html=True)
+                    st.markdown(f"<h3 style='margin-bottom: 5px; color: black;'>Rank {rnk} Combination</h3>", unsafe_allow_html=True)
+                    st.markdown(f"<p style='color: #555; text-transform: uppercase; font-size: 0.85rem; font-weight: 600; margin-bottom: 15px;'>{', '.join(feats)}</p>", unsafe_allow_html=True)
+                    
+                    with st.spinner(f"Running ML Evaluation for Rank {rnk}..."):
+                        res = evaluate_custom_features(j_ticker, j_exch, feats)
+                        
+                    if res:
+                        c1, c2, c3 = st.columns(3)
+                        
+                        col1_html = f"""
+                        <div style="background-color: {res['ml_bg_color']}; border: 1px solid {res['ml_color']}; border-radius: 8px; padding: 10px; text-align: center; height: 100%;">
+                            <p style="margin:0; font-size:12px; font-weight:bold; color:#777; text-transform:uppercase;">AMO Prediction</p>
+                            <h2 style="margin:10px 0; font-size:24px; color:{res['ml_color']};">{res['prob_pct']:.1f}% ({res['ml_pred_label']})</h2>
+                        </div>
+                        """
+                        c1.markdown(col1_html, unsafe_allow_html=True)
+                        
+                        edge_color = "#00C073" if res['true_edge'] > 0 else "#FF2B2B"
+                        col2_html = f"""
+                        <div style="background-color: rgba(255,255,255,0.05); border: 1px solid #EEE; border-radius: 8px; padding: 10px; text-align: center; height: 100%;">
+                            <p style="margin:0; font-size:12px; font-weight:bold; color:#777; text-transform:uppercase;">Test Accuracy</p>
+                            <h2 style="margin:5px 0; font-size:24px; color:black;">{res['test_accuracy']:.1f}%</h2>
+                            <p style="margin:0; font-size:12px; font-weight:bold; color:{edge_color};">Edge: {res['true_edge']:+.1f}%</p>
+                        </div>
+                        """
+                        c2.markdown(col2_html, unsafe_allow_html=True)
+                        
+                        c3.markdown(f"<div style='background-color: rgba(0,0,0,0.02); border-radius: 8px; padding: 10px; height: 100%; border: 1px solid #EEE;'><p style='margin:0; margin-bottom:5px; font-size:12px; font-weight:bold; color:#777; text-transform:uppercase;'>5-Day Regime Sync</p><div style='font-size: 0.9rem;'>{res['latest_result_html']}</div></div>", unsafe_allow_html=True)
+                        
+                    else:
+                        st.warning("Failed to evaluate this feature set.")
+                        
+                    st.markdown("</div>", unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Error parsing JSON: {e}")
 
 if ticker_input:
     with tab1:
