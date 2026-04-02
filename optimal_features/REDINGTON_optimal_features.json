@@ -4,8 +4,22 @@
     "top_combinations": [
         {
             "rank": 1,
-            "accuracy": 0.7083,
+            "accuracy": 0.7188,
             "features": [
+                "Distance_to_Fast_SMA",
+                "ATR_Percent",
+                "Daily_RSI_14",
+                "OFI",
+                "Morning_Autocorr"
+            ],
+            "dataset_rows": 476,
+            "out_of_sample_size": 96
+        },
+        {
+            "rank": 2,
+            "accuracy": 0.6979,
+            "features": [
+                "Closing_Volume_Surge",
                 "Distance_to_Fast_SMA",
                 "ATR_Percent",
                 "OFI",
@@ -15,27 +29,15 @@
             "out_of_sample_size": 96
         },
         {
-            "rank": 2,
-            "accuracy": 0.7083,
+            "rank": 3,
+            "accuracy": 0.6875,
             "features": [
                 "Closing_Volume_Surge",
                 "Distance_to_Fast_SMA",
-                "OFI",
-                "Frac_Diff_Close"
+                "ATR_Percent",
+                "Morning_Autocorr"
             ],
-            "dataset_rows": 477,
-            "out_of_sample_size": 96
-        },
-        {
-            "rank": 3,
-            "accuracy": 0.6979,
-            "features": [
-                "Distance_to_Fast_SMA",
-                "Daily_RSI_14",
-                "OFI",
-                "Frac_Diff_Close"
-            ],
-            "dataset_rows": 477,
+            "dataset_rows": 476,
             "out_of_sample_size": 96
         }
     ]

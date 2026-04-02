@@ -4,13 +4,10 @@
     "top_combinations": [
         {
             "rank": 1,
-            "accuracy": 0.6562,
+            "accuracy": 0.6458,
             "features": [
                 "Closing_Momentum",
-                "Closing_Volume_Surge",
-                "Distance_to_Fast_SMA",
                 "Daily_RSI_14",
-                "Nifty_RSI_14",
                 "US_Overnight_Return"
             ],
             "dataset_rows": 477,
@@ -18,22 +15,22 @@
         },
         {
             "rank": 2,
-            "accuracy": 0.6458,
+            "accuracy": 0.6354,
             "features": [
                 "Closing_Momentum",
                 "Distance_to_Fast_SMA",
-                "Daily_RSI_14"
+                "US_Overnight_Return"
             ],
             "dataset_rows": 477,
             "out_of_sample_size": 96
         },
         {
             "rank": 3,
-            "accuracy": 0.6458,
+            "accuracy": 0.6354,
             "features": [
                 "Closing_Momentum",
-                "Closing_Volume_Surge",
                 "Distance_to_Fast_SMA",
+                "Daily_RSI_14",
                 "US_Overnight_Return"
             ],
             "dataset_rows": 477,

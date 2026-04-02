@@ -1111,6 +1111,91 @@ with tab3:
                     st.markdown("</div>", unsafe_allow_html=True)
         except Exception as e:
             st.error(f"Error parsing JSON: {e}")
+            
+    st.markdown("<hr style='margin-top: 15px; margin-bottom: 15px;'>", unsafe_allow_html=True)
+    
+    with st.expander("📂 Batch JSON Evaluator & Exporter", expanded=False):
+        st.markdown("Upload multiple `.json` files to automatically compile their top optimal evaluations into a single downloadable Excel report.")
+        
+        batch_jsons = st.file_uploader("Select multiple optimal JSON files", type=["json"], accept_multiple_files=True, key="batch_json_upload")
+        
+        if batch_jsons:
+            if st.button("▶ Run Batch Evaluation on All Files", type="primary"):
+                compiled_results = []
+                batch_progress = st.progress(0)
+                batch_status = st.empty()
+                
+                total_files = len(batch_jsons)
+                
+                for idx, file_obj in enumerate(batch_jsons):
+                    try:
+                        b_data = json.load(file_obj)
+                        b_ticker = b_data.get("ticker", "")
+                        b_exch = b_data.get("exchange", "NSE")
+                        b_combs = b_data.get("top_combinations", [])
+                        
+                        batch_status.markdown(f"**Processing:** `{b_ticker}` ({idx+1}/{total_files}). Please wait...")
+                        
+                        if b_ticker and b_combs:
+                            for idx_c, combo in enumerate(b_combs[:3]):
+                                b_rnk = combo.get("rank", idx_c+1)
+                                b_feats = combo.get("features", [])
+                                
+                                res = evaluate_custom_features(b_ticker, b_exch, b_feats)
+                                if res:
+                                    compiled_results.append({
+                                        "Ticker": b_ticker,
+                                        "Rank": b_rnk,
+                                        "Exchange": b_exch,
+                                        "Highest Prob (%)": round(res.get("prob_pct", 0.0), 1),
+                                        "Prediction": res.get("ml_pred_label", "N/A"),
+                                        "Test Accuracy (%)": round(res.get("test_accuracy", 0.0), 1),
+                                        "True Edge (%)": round(res.get("true_edge", 0.0), 1),
+                                        "Features Used": ", ".join(b_feats),
+                                        "Long AMO (%)": round(res.get("prob_long", 0.0), 1),
+                                        "Short AMO (%)": round(res.get("prob_short", 0.0), 1),
+                                        "Hist Long (%)": round(res.get("hist_long", 0.0), 1),
+                                        "Hist Short (%)": round(res.get("hist_short", 0.0), 1)
+                                    })
+                    except Exception as e:
+                        st.error(f"Failed processing {file_obj.name}: {e}")
+                    
+                    batch_progress.progress((idx + 1) / total_files)
+                
+                batch_status.empty()
+                
+                if compiled_results:
+                    st.success(f"Successfully processed {len(compiled_results)} total feature combinations across {total_files} files!")
+                    
+                    df_bulk = pd.DataFrame(compiled_results)
+                    st.dataframe(df_bulk, use_container_width=True)
+                    
+                    buffer = io.BytesIO()
+                    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                        df_bulk.to_excel(writer, index=False, sheet_name='Batch Evaluation')
+                        
+                        # Apply auto-width for better UX natively via openpyxl
+                        worksheet = writer.sheets['Batch Evaluation']
+                        for col in worksheet.columns:
+                            max_length = 0
+                            column = col[0].column_letter
+                            for cell in col:
+                                try:
+                                    if len(str(cell.value)) > max_length:
+                                        max_length = len(cell.value)
+                                except:
+                                    pass
+                            adjusted_width = (max_length + 2)
+                            worksheet.column_dimensions[column].width = adjusted_width
+
+                    st.download_button(
+                        label="📥 Download Excel Report",
+                        data=buffer.getvalue(),
+                        file_name=f"Batch_Evaluations_{pd.Timestamp.today().strftime('%Y_%m_%d')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                else:
+                    st.warning("No valid results were generated from the uploaded files.")
 
 if ticker_input:
     with tab1:
