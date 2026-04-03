@@ -282,6 +282,13 @@ def evaluate_custom_features(ticker_input, exchange, selected_features):
         
         daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
         merge_cols = [c for c in daily_cols if c in df_1d.columns]
+        
+        # Shift daily features by 1 day to prevent intraday data leakage
+        cols_to_shift = ['Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']
+        for c in cols_to_shift:
+            if c in df_1d.columns:
+                df_1d[c] = df_1d[c].shift(1)
+                
         daily_subset = df_1d[merge_cols].dropna()
         df = pd.merge(df, daily_subset, on='DateStr', how='left')
         
@@ -560,10 +567,16 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
             df['Closing_Momentum'] = (df['Close'] - df['Open']) / df['Open']
             df['Closing_Volume_Surge'] = df['Volume'] / df['Volume'].rolling(window=35, min_periods=5).mean()
             
-            # 3. MERGE DAILY DATA
             # 3. MERGE DAILY DATA (Stock + NIFTY Macro)
             daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
             merge_cols = [c for c in daily_cols if c in df_1d.columns]
+            
+            # Shift daily features by 1 day to prevent intraday data leakage
+            cols_to_shift = ['Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']
+            for c in cols_to_shift:
+                if c in df_1d.columns:
+                    df_1d[c] = df_1d[c].shift(1)
+                    
             daily_subset = df_1d[merge_cols].dropna()
             df = pd.merge(df, daily_subset, on='DateStr', how='left')
             
