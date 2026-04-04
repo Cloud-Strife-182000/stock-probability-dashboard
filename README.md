@@ -38,6 +38,20 @@ The script utilizes CPU-bound multiprocessing (`ProcessPoolExecutor`) to sprint 
 
 ---
 
+## 🔍 Feature Usage Analytics
+
+After generating multiple `optimal_features/*.json` files using the selector, you can quickly analyze which specific features are being selected most frequently (or discarded entirely) across all your stocks using the included analytics script:
+
+```bash
+python check_unused_features.py
+```
+
+This utility will parse all processed configurations and output:
+1. A complete list of any unused features that never made the top-3 combinations.
+2. An ordered frequency list showing exactly how many times each feature proved optimal across your tested ticker batch.
+
+---
+
 ## Installation & Setup
 
 1. Install the required data science dependencies from the root directory:
