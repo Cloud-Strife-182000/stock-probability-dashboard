@@ -163,7 +163,7 @@ with col2:
 FEATURE_MAP = {
     "Closing Momentum": 'Closing_Momentum',
     "OBV Slope": 'OBV_Slope',
-    "Anchored CR5": 'Anchored_Close_Return_5',
+    "Dist to SMA5": 'Distance_to_Fast_SMA',
     "ATR %": 'ATR_Percent',
     "Daily RSI": 'Daily_RSI_14',
     "VWAP Dist": 'VWAP_Distance',
@@ -244,7 +244,7 @@ def evaluate_custom_features(ticker_input, exchange, selected_features):
             df_1d['DateStr'] = pd.to_datetime(df_1d['Datetime']).dt.strftime('%Y-%m-%d')
             
         if 'Close' in df_1d.columns and len(df_1d) >= 14:
-            df_1d['Anchored_Close_Return_5'] = (df_1d['Close'] - df_1d['Close'].shift(5)) / df_1d['Close'].shift(5)
+            df_1d['Daily_SMA_5'] = df_1d['Close'].rolling(window=5).mean()
             df_1d['Daily_ATR_14'] = df_1d.ta.atr(length=14)
             df_1d['Daily_RSI_14'] = df_1d.ta.rsi(length=14)
             
@@ -284,11 +284,11 @@ def evaluate_custom_features(ticker_input, exchange, selected_features):
         df['OBV'] = (obv_sign * df['Volume']).cumsum()
         df['OBV_Slope'] = df['OBV'].diff(14) / df['Volume'].rolling(window=14, min_periods=5).mean()
         
-        daily_cols = ['DateStr', 'Anchored_Close_Return_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
+        daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
         merge_cols = [c for c in daily_cols if c in df_1d.columns]
         
         # Shift daily features by 1 day to prevent intraday data leakage
-        cols_to_shift = ['Anchored_Close_Return_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']
+        cols_to_shift = ['Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']
         for c in cols_to_shift:
             if c in df_1d.columns:
                 df_1d[c] = df_1d[c].shift(1)
@@ -300,6 +300,7 @@ def evaluate_custom_features(ticker_input, exchange, selected_features):
             if col != 'DateStr':
                 df[col] = df[col].ffill()
         
+        df['Distance_to_Fast_SMA'] = (df['Close'] - df['Daily_SMA_5']) / df['Daily_SMA_5']
         df['ATR_Percent'] = df['Daily_ATR_14'] / df['Close']
         
         df['Typical_Price'] = (df['High'] + df['Low'] + df['Close']) / 3
@@ -529,7 +530,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                 df_1d['DateStr'] = pd.to_datetime(df_1d['Datetime']).dt.strftime('%Y-%m-%d')
                 
             if 'Close' in df_1d.columns and len(df_1d) >= 14:
-                df_1d['Anchored_Close_Return_5'] = (df_1d['Close'] - df_1d['Close'].shift(5)) / df_1d['Close'].shift(5)
+                df_1d['Daily_SMA_5'] = df_1d['Close'].rolling(window=5).mean()
                 df_1d['Daily_ATR_14'] = df_1d.ta.atr(length=14)
                 df_1d['Daily_RSI_14'] = df_1d.ta.rsi(length=14)
                 
@@ -575,11 +576,11 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
             df['OBV_Slope'] = df['OBV'].diff(14) / df['Volume'].rolling(window=14, min_periods=5).mean()
             
             # 3. MERGE DAILY DATA (Stock + NIFTY Macro)
-            daily_cols = ['DateStr', 'Anchored_Close_Return_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
+            daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
             merge_cols = [c for c in daily_cols if c in df_1d.columns]
             
             # Shift daily features by 1 day to prevent intraday data leakage
-            cols_to_shift = ['Anchored_Close_Return_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']
+            cols_to_shift = ['Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']
             for c in cols_to_shift:
                 if c in df_1d.columns:
                     df_1d[c] = df_1d[c].shift(1)
@@ -592,6 +593,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                 if col != 'DateStr':
                     df[col] = df[col].ffill()
             
+            df['Distance_to_Fast_SMA'] = (df['Close'] - df['Daily_SMA_5']) / df['Daily_SMA_5']
             df['ATR_Percent'] = df['Daily_ATR_14'] / df['Close']
             
             # 3.5 ADVANCED INTRADAY FEATURES
@@ -864,9 +866,9 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
             obv_str = f"{obv_v:+.2f}" if pd.notna(obv_v) else "N/A"
             render_indicator(cols[2], "OBV Slope", obv_str)
             
-            anchor_cr5 = latest_day['Anchored_Close_Return_5'] if 'Anchored_Close_Return_5' in latest_day else float('nan')
-            anchor_cr5_str = f"{anchor_cr5*100:+.2f}%" if pd.notna(anchor_cr5) else "N/A"
-            render_indicator(cols[3], "Anchored CR5", anchor_cr5_str)
+            dist_sma_v = (latest_day['Close'] - latest_day['Daily_SMA_5']) / latest_day['Daily_SMA_5'] if 'Daily_SMA_5' in latest_day else float('nan')
+            dist_sma_str = f"{dist_sma_v*100:+.2f}%" if pd.notna(dist_sma_v) else "N/A"
+            render_indicator(cols[3], "Dist to SMA5", dist_sma_str)
             
             atr_v = latest_day['ATR_Percent'] if 'ATR_Percent' in latest_day else float('nan')
             atr_str = f"{atr_v*100:.2f}%" if pd.notna(atr_v) else "N/A"
@@ -1385,15 +1387,15 @@ with tab4:
             "low": "A large negative value (e.g. -3) means heavy distribution. Values near zero mean volume flow is balanced with no clear directional intent.",
         },
         {
-            "name": "Anchored CR5",
-            "col": "Anchored_Close_Return_5",
-            "icon": "⚓",
-            "what": "The exact percentage return of the current price relative to the closing price from 5 trading days ago. Unlike a moving average, this anchors to a single rigid historical level -- giving the model an un-smoothed structural reference point.",
-            "formula": "(Close_t - Close_t-5) / Close_t-5",
-            "positive": "Price has risen over the past 5 days -- the stock is in a short-term uptrend relative to its exact anchor.",
-            "negative": "Price has fallen over the past 5 days -- the stock is in a short-term downtrend relative to its exact anchor.",
-            "high": "A value like +5% means a strong 5-day rally. Algorithmic traders may view this as overextension from structure.",
-            "low": "A value like -5% means a sharp 5-day decline. May signal oversold conditions relative to the structural anchor.",
+            "name": "Dist to SMA5",
+            "col": "Distance_to_Fast_SMA",
+            "icon": "📏",
+            "what": "The percentage distance between the current 1-hour close and the 5-day Daily Simple Moving Average (SMA). Tells you if the stock is trading above or below its recent short-term trend.",
+            "formula": "(Price - DailySMA5) / DailySMA5",
+            "positive": "Price is above the 5-day average -- the short-term trend is bullish.",
+            "negative": "Price is below the 5-day average -- the short-term trend is bearish.",
+            "high": "A large positive value (e.g. +3%) means the stock is stretched far above its average and might be overextended.",
+            "low": "A large negative value (e.g. -3%) means the stock is trading significantly below its average and might be oversold.",
         },
         {
             "name": "ATR %",

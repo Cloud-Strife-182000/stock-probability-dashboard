@@ -7,7 +7,7 @@ from collections import Counter
 ALL_FEATURES = {
     'Closing_Momentum',
     'OBV_Slope',
-    'Anchored_Close_Return_5',
+    'Distance_to_Fast_SMA',
     'ATR_Percent',
     'Daily_RSI_14',
     'VWAP_Distance',
