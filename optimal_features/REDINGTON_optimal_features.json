@@ -6,10 +6,11 @@
             "rank": 1,
             "accuracy": 0.7083,
             "features": [
-                "Anchored_Close_Return_5",
-                "ATR_Percent",
+                "Closing_Momentum",
+                "Distance_to_Fast_SMA",
                 "Daily_RSI_14",
-                "OFI"
+                "OFI",
+                "Nifty_Trend_Dist"
             ],
             "dataset_rows": 476,
             "out_of_sample_size": 96
@@ -29,9 +30,8 @@
             "rank": 3,
             "accuracy": 0.6875,
             "features": [
-                "Closing_Momentum",
-                "Anchored_Close_Return_5",
-                "Frac_Diff_Close",
+                "Distance_to_Fast_SMA",
+                "OFI",
                 "Nifty_Trend_Dist"
             ],
             "dataset_rows": 476,
