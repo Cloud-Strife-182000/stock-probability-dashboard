@@ -6,7 +6,7 @@ from collections import Counter
 # The complete list of possible features derived from brute_force_selection.py
 ALL_FEATURES = {
     'Closing_Momentum',
-    'Closing_Volume_Surge',
+    'OBV_Slope',
     'Distance_to_Fast_SMA',
     'ATR_Percent',
     'Daily_RSI_14',

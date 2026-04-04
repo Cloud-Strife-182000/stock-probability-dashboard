@@ -19,7 +19,7 @@ from sklearn.base import clone
 
 FEATURE_MAP = {
     "Closing Momentum": 'Closing_Momentum',
-    "Volume Surge": 'Closing_Volume_Surge',
+    "OBV Slope": 'OBV_Slope',
     "Dist to SMA5": 'Distance_to_Fast_SMA',
     "ATR %": 'ATR_Percent',
     "Daily RSI": 'Daily_RSI_14',
@@ -147,7 +147,11 @@ def prepare_data(ticker, exchange):
     df['TimeStr'] = df['DatetimeObj'].dt.strftime('%H:%M')
     
     df['Closing_Momentum'] = (df['Close'] - df['Open']) / df['Open']
-    df['Closing_Volume_Surge'] = df['Volume'] / df['Volume'].rolling(window=35, min_periods=5).mean()
+    
+    obv_sign = np.where(df['Close'] > df['Close'].shift(1), 1,
+               np.where(df['Close'] < df['Close'].shift(1), -1, 0))
+    df['OBV'] = (obv_sign * df['Volume']).cumsum()
+    df['OBV_Slope'] = df['OBV'].diff(14) / df['Volume'].rolling(window=14, min_periods=5).mean()
     
     daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
     merge_cols = [c for c in daily_cols if c in df_1d.columns]

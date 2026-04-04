@@ -162,7 +162,7 @@ with col2:
 # --- NEW: DYNAMIC FEATURE SELECTION UI ---
 FEATURE_MAP = {
     "Closing Momentum": 'Closing_Momentum',
-    "Volume Surge": 'Closing_Volume_Surge',
+    "OBV Slope": 'OBV_Slope',
     "Dist to SMA5": 'Distance_to_Fast_SMA',
     "ATR %": 'ATR_Percent',
     "Daily RSI": 'Daily_RSI_14',
@@ -278,7 +278,11 @@ def evaluate_custom_features(ticker_input, exchange, selected_features):
         df['TimeStr'] = df['DatetimeObj'].dt.strftime('%H:%M')
         
         df['Closing_Momentum'] = (df['Close'] - df['Open']) / df['Open']
-        df['Closing_Volume_Surge'] = df['Volume'] / df['Volume'].rolling(window=35, min_periods=5).mean()
+        
+        obv_sign = np.where(df['Close'] > df['Close'].shift(1), 1,
+                   np.where(df['Close'] < df['Close'].shift(1), -1, 0))
+        df['OBV'] = (obv_sign * df['Volume']).cumsum()
+        df['OBV_Slope'] = df['OBV'].diff(14) / df['Volume'].rolling(window=14, min_periods=5).mean()
         
         daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
         merge_cols = [c for c in daily_cols if c in df_1d.columns]
@@ -565,7 +569,11 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
             
             # Calculate rolling indicators directly on 1h chart
             df['Closing_Momentum'] = (df['Close'] - df['Open']) / df['Open']
-            df['Closing_Volume_Surge'] = df['Volume'] / df['Volume'].rolling(window=35, min_periods=5).mean()
+            
+            obv_sign = np.where(df['Close'] > df['Close'].shift(1), 1,
+                       np.where(df['Close'] < df['Close'].shift(1), -1, 0))
+            df['OBV'] = (obv_sign * df['Volume']).cumsum()
+            df['OBV_Slope'] = df['OBV'].diff(14) / df['Volume'].rolling(window=14, min_periods=5).mean()
             
             # 3. MERGE DAILY DATA (Stock + NIFTY Macro)
             daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
@@ -854,9 +862,9 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
             mom_str = f"{mom_v*100:+.2f}%" if pd.notna(mom_v) else "N/A"
             render_indicator(cols[1], "Momentum (1H)", mom_str)
             
-            vol_v = latest_day['Closing_Volume_Surge'] if 'Closing_Volume_Surge' in latest_day else float('nan')
-            vol_str = f"{vol_v:.2f}x" if pd.notna(vol_v) else "N/A"
-            render_indicator(cols[2], "Volume Surge", vol_str)
+            obv_v = latest_day['OBV_Slope'] if 'OBV_Slope' in latest_day else float('nan')
+            obv_str = f"{obv_v:+.2f}" if pd.notna(obv_v) else "N/A"
+            render_indicator(cols[2], "OBV Slope", obv_str)
             
             sma_dist = latest_day['Distance_to_Fast_SMA'] if 'Distance_to_Fast_SMA' in latest_day else float('nan')
             sma_str = f"{sma_dist*100:+.2f}%" if pd.notna(sma_dist) else "N/A"
