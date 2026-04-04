@@ -28,17 +28,13 @@
         },
         {
             "rank": 3,
-            "accuracy": 0.6737,
+            "accuracy": 0.6667,
             "features": [
-                "OBV_Slope",
-                "Distance_to_Fast_SMA",
                 "ATR_Percent",
-                "Daily_RSI_14",
-                "VWAP_Distance",
-                "Morning_Autocorr"
+                "Nifty_Trend_Dist"
             ],
-            "dataset_rows": 475,
-            "out_of_sample_size": 95
+            "dataset_rows": 476,
+            "out_of_sample_size": 96
         }
     ]
 }

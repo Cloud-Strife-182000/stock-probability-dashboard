@@ -29,7 +29,7 @@ FEATURE_MAP = {
     "Nifty Momentum": 'Nifty_Momentum',
     "Nifty RSI": 'Nifty_RSI_14',
     "Nifty Trend": 'Nifty_Trend_Dist',
-    "Morning Autocorr": 'Morning_Autocorr',
+    "Gap %": 'Gap_Percentage',
     "US Overnight Ret": 'US_Overnight_Return'
 }
 ALL_FEATURES = list(FEATURE_MAP.values())
@@ -116,6 +116,7 @@ def prepare_data(ticker, exchange):
         df_1d['Daily_SMA_5'] = df_1d['Close'].rolling(window=5).mean()
         df_1d['Daily_ATR_14'] = df_1d.ta.atr(length=14)
         df_1d['Daily_RSI_14'] = df_1d.ta.rsi(length=14)
+        df_1d['Gap_Percentage'] = (df_1d['Open'] - df_1d['Close'].shift(1)) / df_1d['Close'].shift(1)
         
     nifty_df = fetch_nifty_data()
     if not nifty_df.empty:
@@ -153,7 +154,7 @@ def prepare_data(ticker, exchange):
     df['OBV'] = (obv_sign * df['Volume']).cumsum()
     df['OBV_Slope'] = df['OBV'].diff(14) / df['Volume'].rolling(window=14, min_periods=5).mean()
     
-    daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
+    daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return', 'Gap_Percentage']
     merge_cols = [c for c in daily_cols if c in df_1d.columns]
     
     # Shift daily features by 1 day to prevent intraday data leakage
@@ -181,10 +182,8 @@ def prepare_data(ticker, exchange):
     
     df['Frac_Diff_Close'] = frac_diff_ffd(df['Close'], d=0.4)
     
+    # Removed Morning_Autocorr (replaced by Gap_Percentage)
     df = df.sort_values(['DateStr', 'DatetimeObj'])
-    day_opens = df.groupby('DateStr')['Open'].transform('first')
-    p1015 = df[df['TimeStr'] == '10:15'].set_index('DateStr')['Close']
-    df['Morning_Autocorr'] = (df['DateStr'].map(p1015) - day_opens) / day_opens
     
     hl_range = df['High'] - df['Low']
     hl_range = hl_range.replace(0, np.nan)

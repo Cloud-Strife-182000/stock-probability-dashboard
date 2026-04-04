@@ -25,12 +25,11 @@
         },
         {
             "rank": 3,
-            "accuracy": 0.6146,
+            "accuracy": 0.625,
             "features": [
-                "Distance_to_Fast_SMA",
                 "VWAP_Distance",
-                "OFI",
-                "Nifty_Momentum"
+                "Gap_Percentage",
+                "US_Overnight_Return"
             ],
             "dataset_rows": 476,
             "out_of_sample_size": 96

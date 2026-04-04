@@ -17,11 +17,16 @@
         },
         {
             "rank": 2,
-            "accuracy": 0.6875,
+            "accuracy": 0.6979,
             "features": [
-                "ATR_Percent",
+                "Closing_Momentum",
+                "OBV_Slope",
+                "Distance_to_Fast_SMA",
+                "Daily_RSI_14",
                 "OFI",
-                "Nifty_Trend_Dist"
+                "Nifty_RSI_14",
+                "Nifty_Trend_Dist",
+                "Gap_Percentage"
             ],
             "dataset_rows": 476,
             "out_of_sample_size": 96
@@ -30,7 +35,7 @@
             "rank": 3,
             "accuracy": 0.6875,
             "features": [
-                "Distance_to_Fast_SMA",
+                "ATR_Percent",
                 "OFI",
                 "Nifty_Trend_Dist"
             ],

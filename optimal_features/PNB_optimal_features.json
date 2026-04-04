@@ -15,21 +15,6 @@
         },
         {
             "rank": 2,
-            "accuracy": 0.6632,
-            "features": [
-                "OBV_Slope",
-                "ATR_Percent",
-                "VWAP_Distance",
-                "OFI",
-                "Nifty_Momentum",
-                "Nifty_Trend_Dist",
-                "Morning_Autocorr"
-            ],
-            "dataset_rows": 475,
-            "out_of_sample_size": 95
-        },
-        {
-            "rank": 3,
             "accuracy": 0.6562,
             "features": [
                 "OBV_Slope",
@@ -39,6 +24,21 @@
                 "Frac_Diff_Close",
                 "Nifty_RSI_14",
                 "Nifty_Trend_Dist"
+            ],
+            "dataset_rows": 476,
+            "out_of_sample_size": 96
+        },
+        {
+            "rank": 3,
+            "accuracy": 0.6562,
+            "features": [
+                "OBV_Slope",
+                "OFI",
+                "Frac_Diff_Close",
+                "Nifty_Momentum",
+                "Nifty_RSI_14",
+                "Nifty_Trend_Dist",
+                "US_Overnight_Return"
             ],
             "dataset_rows": 476,
             "out_of_sample_size": 96

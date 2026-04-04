@@ -172,7 +172,7 @@ FEATURE_MAP = {
     "Nifty Momentum": 'Nifty_Momentum',
     "Nifty RSI": 'Nifty_RSI_14',
     "Nifty Trend": 'Nifty_Trend_Dist',
-    "Morning Autocorr": 'Morning_Autocorr',
+    "Gap %": 'Gap_Percentage',
     "US Overnight Ret": 'US_Overnight_Return'
 }
 
@@ -247,6 +247,7 @@ def evaluate_custom_features(ticker_input, exchange, selected_features):
             df_1d['Daily_SMA_5'] = df_1d['Close'].rolling(window=5).mean()
             df_1d['Daily_ATR_14'] = df_1d.ta.atr(length=14)
             df_1d['Daily_RSI_14'] = df_1d.ta.rsi(length=14)
+            df_1d['Gap_Percentage'] = (df_1d['Open'] - df_1d['Close'].shift(1)) / df_1d['Close'].shift(1)
             
         nifty_df = fetch_nifty_data()
         if not nifty_df.empty:
@@ -284,7 +285,7 @@ def evaluate_custom_features(ticker_input, exchange, selected_features):
         df['OBV'] = (obv_sign * df['Volume']).cumsum()
         df['OBV_Slope'] = df['OBV'].diff(14) / df['Volume'].rolling(window=14, min_periods=5).mean()
         
-        daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
+        daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return', 'Gap_Percentage']
         merge_cols = [c for c in daily_cols if c in df_1d.columns]
         
         # Shift daily features by 1 day to prevent intraday data leakage
@@ -312,10 +313,8 @@ def evaluate_custom_features(ticker_input, exchange, selected_features):
         
         df['Frac_Diff_Close'] = frac_diff_ffd(df['Close'], d=0.4)
         
+        # Removed Morning_Autocorr (replaced by Gap_Percentage)
         df = df.sort_values(['DateStr', 'DatetimeObj'])
-        day_opens = df.groupby('DateStr')['Open'].transform('first')
-        p1015 = df[df['TimeStr'] == '10:15'].set_index('DateStr')['Close']
-        df['Morning_Autocorr'] = (df['DateStr'].map(p1015) - day_opens) / day_opens
         
         hl_range = df['High'] - df['Low']
         hl_range = hl_range.replace(0, np.nan)
@@ -533,6 +532,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                 df_1d['Daily_SMA_5'] = df_1d['Close'].rolling(window=5).mean()
                 df_1d['Daily_ATR_14'] = df_1d.ta.atr(length=14)
                 df_1d['Daily_RSI_14'] = df_1d.ta.rsi(length=14)
+                df_1d['Gap_Percentage'] = (df_1d['Open'] - df_1d['Close'].shift(1)) / df_1d['Close'].shift(1)
                 
             # 1.5 MERGE NIFTY MACO DATA
             nifty_df = fetch_nifty_data()
@@ -576,7 +576,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
             df['OBV_Slope'] = df['OBV'].diff(14) / df['Volume'].rolling(window=14, min_periods=5).mean()
             
             # 3. MERGE DAILY DATA (Stock + NIFTY Macro)
-            daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
+            daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return', 'Gap_Percentage']
             merge_cols = [c for c in daily_cols if c in df_1d.columns]
             
             # Shift daily features by 1 day to prevent intraday data leakage
@@ -607,11 +607,8 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
             # 3.55 DYNAMIC FEATURES
             df['Frac_Diff_Close'] = frac_diff_ffd(df['Close'], d=0.4)
             
-            # 3.55 MORNING AUTOCORRELATION (10:15 AM Price vs Open)
+            # Removed Morning_Autocorr (replaced by Gap_Percentage)
             df = df.sort_values(['DateStr', 'DatetimeObj'])
-            day_opens = df.groupby('DateStr')['Open'].transform('first')
-            p1015 = df[df['TimeStr'] == '10:15'].set_index('DateStr')['Close']
-            df['Morning_Autocorr'] = (df['DateStr'].map(p1015) - day_opens) / day_opens
             
             # 3.55 ORDER FLOW IMBALANCE
             hl_range = df['High'] - df['Low']
@@ -1486,15 +1483,15 @@ with tab4:
             "low": "A value like -3% means the market is significantly below trend -- potential for a relief rally.",
         },
         {
-            "name": "Morning Autocorr",
-            "col": "Morning_Autocorr",
+            "name": "Gap %",
+            "col": "Gap_Percentage",
             "icon": "🌅",
-            "what": "The return from market open (9:15 AM) to 10:15 AM, expressed as a percentage. Captures the early-morning directional bias. Autocorrelation in morning moves can predict the rest of the day.",
-            "formula": "(Close at 10:15 - Open at 9:15) / Open at 9:15",
-            "positive": "The stock rallied in the first hour -- morning buyers were aggressive. This momentum often carries forward.",
-            "negative": "The stock sold off in the first hour -- morning sellers dominated. Negative autocorrelation may signal continued weakness.",
-            "high": "A large positive value (e.g. +2%) means a strong opening rally -- high conviction from early participants.",
-            "low": "A large negative value means a sharp morning sell-off. Near zero means a flat, indecisive open.",
+            "what": "The percentage difference between today's opening price and yesterday's closing price. Captures the overnight sentiment and psychological gap at the open.",
+            "formula": "(TodayOpen - YesterdayClose) / YesterdayClose",
+            "positive": "Stock gapped up -- overnight sentiment was bullish. May lead to follow-through or a 'gap and crap' reversal.",
+            "negative": "Stock gapped down -- overnight sentiment was bearish. Often a sign of institutional selling or negative news.",
+            "high": "A large gap (e.g. +/-2%+) indicates a major sentiment shift overnight. High-volatility regime for the morning.",
+            "low": "A small gap (near 0%) means the stock opened flat. No major overnight catalysts; price action may be more range-bound.",
         },
         {
             "name": "US Overnight Ret",

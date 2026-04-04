@@ -16,7 +16,7 @@ ALL_FEATURES = {
     'Nifty_Momentum',
     'Nifty_RSI_14',
     'Nifty_Trend_Dist',
-    'Morning_Autocorr',
+    'Gap_Percentage',
     'US_Overnight_Return'
 }
 
