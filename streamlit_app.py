@@ -1072,7 +1072,7 @@ with st.expander("📂 Batch Watchlist Import", expanded=False):
         else:
             st.warning("The uploaded file appears to be empty or has no valid ticker names.")
 
-tab1, tab2, tab3 = st.tabs(["📊 Main Dashboard", "⭐ Watchlist", "🔬 Backtest JSON"])
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Main Dashboard", "⭐ Watchlist", "🔬 Backtest JSON", "📖 Feature Glossary"])
 
 with tab3:
     st.markdown("### 🔬 Evaluate Custom Feature Sets")
@@ -1355,3 +1355,189 @@ with tab2:
                 </div>
             </div>
             """, unsafe_allow_html=True)
+
+with tab4:
+    st.markdown("### 📖 Feature Glossary")
+    st.markdown("A plain-language guide to every feature the model can use. Understanding these helps you interpret the prediction and tune feature selection.")
+    st.markdown("<hr style='margin-top: 5px; margin-bottom: 1.5rem;'>", unsafe_allow_html=True)
+
+    glossary_entries = [
+        {
+            "name": "Closing Momentum",
+            "col": "Closing_Momentum",
+            "icon": "📈",
+            "what": "Measures how much the price moved within a single 1-hour candle, expressed as a percentage of the open price.",
+            "formula": "(Close − Open) / Open",
+            "positive": "The candle closed higher than it opened — buyers dominated that hour.",
+            "negative": "The candle closed lower than it opened — sellers dominated that hour.",
+            "high": "A large absolute value (e.g. ±2%+) means a strong directional move happened in that hour — high conviction from one side.",
+            "low": "Near zero means the candle was indecisive — open and close were almost the same (doji-like).",
+        },
+        {
+            "name": "OBV Slope",
+            "col": "OBV_Slope",
+            "icon": "⚖️",
+            "what": "Tracks the direction of On Balance Volume (OBV) over 14 periods. OBV adds volume on up-candles and subtracts it on down-candles. The slope tells you if smart money is accumulating or distributing, normalized by average volume so it's comparable across stocks.",
+            "formula": "OBV.diff(14) / Volume.rolling(14).mean()",
+            "positive": "OBV is rising — net volume flow is into the stock (accumulation). Institutions are likely buying.",
+            "negative": "OBV is falling — net volume flow is out of the stock (distribution). Institutions are likely selling.",
+            "high": "A large positive value (e.g. +3) means OBV surged upward by 3× the average volume over 14 periods — very strong accumulation.",
+            "low": "A large negative value (e.g. −3) means heavy distribution. Values near zero mean volume flow is balanced with no clear directional intent.",
+        },
+        {
+            "name": "Dist to SMA5",
+            "col": "Distance_to_Fast_SMA",
+            "icon": "📏",
+            "what": "How far the current price is from its 5-day Simple Moving Average, as a percentage. This is a mean-reversion signal — prices tend to return to their short-term average.",
+            "formula": "(Close − SMA5) / SMA5",
+            "positive": "Price is above its 5-day average — the stock is in a short-term uptrend or potentially overextended.",
+            "negative": "Price is below its 5-day average — the stock is in a short-term downtrend or potentially oversold.",
+            "high": "A value like +3% means the stock is stretched well above its recent average — it may snap back down.",
+            "low": "A value like −3% means the stock is stretched well below average — it may bounce back up.",
+        },
+        {
+            "name": "ATR %",
+            "col": "ATR_Percent",
+            "icon": "🌊",
+            "what": "The 14-day Average True Range expressed as a percentage of the current price. Measures how volatile the stock is — higher ATR% means bigger daily swings.",
+            "formula": "ATR(14) / Close",
+            "positive": "Always positive. This is a magnitude-only indicator.",
+            "negative": "N/A — this value is always positive.",
+            "high": "High values (e.g. 4%+) mean the stock swings a lot day-to-day. More volatile = riskier but potentially more profitable for directional bets.",
+            "low": "Low values (e.g. <1%) mean the stock barely moves. Calm, low-volatility regime — smaller profit potential per trade.",
+        },
+        {
+            "name": "Daily RSI",
+            "col": "Daily_RSI_14",
+            "icon": "🔥",
+            "what": "The 14-day Relative Strength Index. Classic momentum oscillator that ranges from 0 to 100. Measures if a stock has been overbought or oversold recently.",
+            "formula": "RSI(14) on daily closes",
+            "positive": "N/A — RSI is always between 0 and 100.",
+            "negative": "N/A — RSI is always between 0 and 100.",
+            "high": "Above 70 → Overbought. The stock has risen a lot recently and may be due for a pullback.",
+            "low": "Below 30 → Oversold. The stock has fallen a lot recently and may be due for a bounce. Between 40–60 is neutral territory.",
+        },
+        {
+            "name": "VWAP Dist",
+            "col": "VWAP_Distance",
+            "icon": "⚡",
+            "what": "How far the current price is from the intraday Volume Weighted Average Price (VWAP). VWAP is the \"fair price\" institutional traders benchmark against.",
+            "formula": "(Close − VWAP) / VWAP",
+            "positive": "Price is above VWAP — buyers are in control and willing to pay more than the average traded price today.",
+            "negative": "Price is below VWAP — sellers are in control. Institutions may view the stock as expensive relative to today's volume.",
+            "high": "A large positive distance means strong bullish intraday momentum. The stock is trading well above its volume-weighted average.",
+            "low": "A large negative distance means strong bearish intraday pressure. Near zero means price is trading at fair value.",
+        },
+        {
+            "name": "OFI (Order Flow)",
+            "col": "OFI",
+            "icon": "🔄",
+            "what": "Order Flow Imbalance — estimates whether buyers or sellers dominated each candle based on where the close falls within the high-low range, smoothed over 5 periods.",
+            "formula": "((Close−Low) − (High−Close)) / (High−Low), rolled over 5 candles",
+            "positive": "Close is consistently near the high of each candle — buyers are absorbing all selling pressure (bullish flow).",
+            "negative": "Close is consistently near the low — sellers are overwhelming buyers (bearish flow).",
+            "high": "Near +1.0 means almost every recent candle closed at its high — extreme buying pressure.",
+            "low": "Near −1.0 means every recent candle closed at its low — extreme selling pressure. Near 0 means balanced, tug-of-war action.",
+        },
+        {
+            "name": "Frac Diff (Memory)",
+            "col": "Frac_Diff_Close",
+            "icon": "🧠",
+            "what": "Fractionally Differenced Close price (d=0.4). A technique from Lopez de Prado that makes the price series stationary for ML while preserving long-term memory. Unlike simple returns that forget history, this retains trend information.",
+            "formula": "FFD(Close, d=0.4)",
+            "positive": "The memory-preserving transformation is trending upward — the stock has persistent bullish momentum with historical context.",
+            "negative": "The transformation is trending downward — persistent bearish momentum.",
+            "high": "Large absolute values indicate the stock is in a strong, sustained trend (the memory effect amplifies persistent moves).",
+            "low": "Small values near zero indicate the stock is range-bound or the trend has stalled.",
+        },
+        {
+            "name": "Nifty Momentum",
+            "col": "Nifty_Momentum",
+            "icon": "🇮🇳",
+            "what": "The daily open-to-close return of the NIFTY 50 index. Captures the broad market sentiment in India for that day.",
+            "formula": "(NIFTY Close − NIFTY Open) / NIFTY Open",
+            "positive": "The broad Indian market closed up that day — bullish macro sentiment. Individual stocks tend to follow.",
+            "negative": "The broad market closed down — bearish macro sentiment. Headwind for individual long positions.",
+            "high": "A value like +1.5% means the market had a strong rally day. Most stocks benefit from this tailwind.",
+            "low": "A value like −1.5% means a broad sell-off. Even fundamentally strong stocks can get dragged down.",
+        },
+        {
+            "name": "Nifty RSI",
+            "col": "Nifty_RSI_14",
+            "icon": "📊",
+            "what": "The 14-day RSI of the NIFTY 50 index. Tells you if the overall Indian market is overbought or oversold.",
+            "formula": "RSI(14) on NIFTY 50 daily closes",
+            "positive": "N/A — always between 0 and 100.",
+            "negative": "N/A — always between 0 and 100.",
+            "high": "Above 70 → The entire market has been rallying hard and may be due for a correction. Risk of mean-reversion is elevated.",
+            "low": "Below 30 → The entire market is deeply oversold — historically a contrarian buy signal for the broader market.",
+        },
+        {
+            "name": "Nifty Trend",
+            "col": "Nifty_Trend_Dist",
+            "icon": "📐",
+            "what": "How far the NIFTY 50 is from its 20-day Exponential Moving Average. Measures whether the broad market is extended or at equilibrium.",
+            "formula": "(NIFTY Close − EMA20) / EMA20",
+            "positive": "NIFTY is trading above its 20-day trend — the macro environment is bullish.",
+            "negative": "NIFTY is below its 20-day trend — the macro environment is bearish.",
+            "high": "A value like +3% means the market is significantly stretched above trend — potential for a pullback.",
+            "low": "A value like −3% means the market is significantly below trend — potential for a relief rally.",
+        },
+        {
+            "name": "Morning Autocorr",
+            "col": "Morning_Autocorr",
+            "icon": "🌅",
+            "what": "The return from market open (9:15 AM) to 10:15 AM, expressed as a percentage. Captures the early-morning directional bias. Autocorrelation in morning moves can predict the rest of the day.",
+            "formula": "(Close at 10:15 − Open at 9:15) / Open at 9:15",
+            "positive": "The stock rallied in the first hour — morning buyers were aggressive. This momentum often carries forward.",
+            "negative": "The stock sold off in the first hour — morning sellers dominated. Negative autocorrelation may signal continued weakness.",
+            "high": "A large positive value (e.g. +2%) means a strong opening rally — high conviction from early participants.",
+            "low": "A large negative value means a sharp morning sell-off. Near zero means a flat, indecisive open.",
+        },
+        {
+            "name": "US Overnight Ret",
+            "col": "US_Overnight_Return",
+            "icon": "🇺🇸",
+            "what": "The previous day's S&P 500 daily return. Since US markets close after Indian markets, this captures the overnight global sentiment that Indian markets will react to the next morning.",
+            "formula": "S&P 500 daily return, shifted forward by 1 day",
+            "positive": "The US market closed up overnight — typically a bullish tailwind for Indian markets at the open.",
+            "negative": "The US market closed down overnight — typically a bearish headwind. Indian markets often gap down following US sell-offs.",
+            "high": "A value like +2% means a strong US rally — expect a positive gap-up in Indian markets.",
+            "low": "A value like −2% means a sharp US sell-off — expect a negative gap-down. Near zero means neutral overnight sentiment.",
+        },
+    ]
+
+    for entry in glossary_entries:
+        st.markdown(f"""
+        <div style="padding: 1.2rem; border-radius: 10px; background-color: rgba(0,0,0,0.02); border: 1px solid #E0E0E0; margin-bottom: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.04);">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                <span style="font-size: 1.6rem;">{entry['icon']}</span>
+                <div>
+                    <h4 style="margin: 0; color: #1D4ED8; font-size: 1.15rem;">{entry['name']}</h4>
+                    <code style="font-size: 0.8rem; color: #888; background: rgba(0,0,0,0.04); padding: 2px 6px; border-radius: 3px;">{entry['col']}</code>
+                </div>
+            </div>
+            <p style="margin: 0 0 12px 0; color: #333; font-size: 0.95rem; line-height: 1.5;">{entry['what']}</p>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                <div style="flex: 1; min-width: 220px; padding: 8px 12px; border-radius: 6px; background-color: rgba(0, 192, 115, 0.08); border-left: 3px solid #00C073;">
+                    <p style="margin: 0 0 2px 0; font-size: 0.75rem; font-weight: 700; color: #00C073; text-transform: uppercase;">Positive (+)</p>
+                    <p style="margin: 0; font-size: 0.85rem; color: #333;">{entry['positive']}</p>
+                </div>
+                <div style="flex: 1; min-width: 220px; padding: 8px 12px; border-radius: 6px; background-color: rgba(255, 43, 43, 0.08); border-left: 3px solid #FF2B2B;">
+                    <p style="margin: 0 0 2px 0; font-size: 0.75rem; font-weight: 700; color: #FF2B2B; text-transform: uppercase;">Negative (−)</p>
+                    <p style="margin: 0; font-size: 0.85rem; color: #333;">{entry['negative']}</p>
+                </div>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;">
+                <div style="flex: 1; min-width: 220px; padding: 8px 12px; border-radius: 6px; background-color: rgba(29, 78, 216, 0.06); border-left: 3px solid #1D4ED8;">
+                    <p style="margin: 0 0 2px 0; font-size: 0.75rem; font-weight: 700; color: #1D4ED8; text-transform: uppercase;">High Value</p>
+                    <p style="margin: 0; font-size: 0.85rem; color: #333;">{entry['high']}</p>
+                </div>
+                <div style="flex: 1; min-width: 220px; padding: 8px 12px; border-radius: 6px; background-color: rgba(128, 128, 128, 0.08); border-left: 3px solid #888;">
+                    <p style="margin: 0 0 2px 0; font-size: 0.75rem; font-weight: 700; color: #666; text-transform: uppercase;">Low Value</p>
+                    <p style="margin: 0; font-size: 0.85rem; color: #333;">{entry['low']}</p>
+                </div>
+            </div>
+            <p style="margin: 8px 0 0 0; font-size: 0.8rem; color: #999;"><b>Formula:</b> <code style="background: rgba(0,0,0,0.04); padding: 1px 5px; border-radius: 3px;">{entry['formula']}</code></p>
+        </div>
+        """, unsafe_allow_html=True)
