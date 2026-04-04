@@ -6,9 +6,9 @@
             "rank": 1,
             "accuracy": 0.6771,
             "features": [
-                "Closing_Volume_Surge",
-                "Distance_to_Fast_SMA",
+                "OBV_Slope",
                 "ATR_Percent",
+                "Daily_RSI_14",
                 "Nifty_RSI_14"
             ],
             "dataset_rows": 476,
@@ -16,9 +16,11 @@
         },
         {
             "rank": 2,
-            "accuracy": 0.6667,
+            "accuracy": 0.6771,
             "features": [
+                "OBV_Slope",
                 "ATR_Percent",
+                "Frac_Diff_Close",
                 "Nifty_Trend_Dist"
             ],
             "dataset_rows": 476,
@@ -26,14 +28,17 @@
         },
         {
             "rank": 3,
-            "accuracy": 0.6667,
+            "accuracy": 0.6737,
             "features": [
+                "OBV_Slope",
+                "Distance_to_Fast_SMA",
                 "ATR_Percent",
                 "Daily_RSI_14",
-                "VWAP_Distance"
+                "VWAP_Distance",
+                "Morning_Autocorr"
             ],
-            "dataset_rows": 476,
-            "out_of_sample_size": 96
+            "dataset_rows": 475,
+            "out_of_sample_size": 95
         }
     ]
 }

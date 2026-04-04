@@ -15,11 +15,14 @@
         },
         {
             "rank": 2,
-            "accuracy": 0.6526,
+            "accuracy": 0.6632,
             "features": [
+                "OBV_Slope",
                 "ATR_Percent",
                 "VWAP_Distance",
-                "Nifty_RSI_14",
+                "OFI",
+                "Nifty_Momentum",
+                "Nifty_Trend_Dist",
                 "Morning_Autocorr"
             ],
             "dataset_rows": 475,
@@ -27,10 +30,14 @@
         },
         {
             "rank": 3,
-            "accuracy": 0.6458,
+            "accuracy": 0.6562,
             "features": [
+                "OBV_Slope",
+                "ATR_Percent",
+                "VWAP_Distance",
                 "OFI",
                 "Frac_Diff_Close",
+                "Nifty_RSI_14",
                 "Nifty_Trend_Dist"
             ],
             "dataset_rows": 476,

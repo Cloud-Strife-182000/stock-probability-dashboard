@@ -163,7 +163,7 @@ with col2:
 FEATURE_MAP = {
     "Closing Momentum": 'Closing_Momentum',
     "OBV Slope": 'OBV_Slope',
-    "Dist to SMA5": 'Distance_to_Fast_SMA',
+    "Anchored CR5": 'Anchored_Close_Return_5',
     "ATR %": 'ATR_Percent',
     "Daily RSI": 'Daily_RSI_14',
     "VWAP Dist": 'VWAP_Distance',
@@ -193,16 +193,16 @@ if ticker_input:
         st.session_state['confirmed_features'] = [c for c in FEATURE_MAP.values() if st.session_state.get(f"feat_{c}", True)]
         st.session_state['skip_render'] = False
 
-with st.expander("🛠️ Advanced Model Settings", expanded=False):
+with st.expander("[Settings] Advanced Model Settings", expanded=False):
     c1, c2 = st.columns(2)
     # Select/Deselect Utilities
-    if c1.button("✅ Select All Features", use_container_width=True):
+    if c1.button("[OK] Select All Features", use_container_width=True):
         for col_name in FEATURE_MAP.values():
             st.session_state[f"feat_{col_name}"] = True
         st.session_state['skip_render'] = True
         st.rerun()
     
-    if c2.button("❌ Deselect All Features", use_container_width=True):
+    if c2.button("[X] Deselect All Features", use_container_width=True):
         for col_name in FEATURE_MAP.values():
             st.session_state[f"feat_{col_name}"] = False
         st.session_state['skip_render'] = True
@@ -214,10 +214,10 @@ with st.expander("🛠️ Advanced Model Settings", expanded=False):
         for i, (label, col_name) in enumerate(FEATURE_MAP.items()):
             cols[i % 3].checkbox(label, key=f"feat_{col_name}")
 
-        if st.form_submit_button("🚀 Re-Train Model", use_container_width=True):
+        if st.form_submit_button("[Run] Re-Train Model", use_container_width=True):
             st.session_state['confirmed_features'] = [c for c in FEATURE_MAP.values() if st.session_state.get(f"feat_{c}", True)]
             st.session_state['skip_render'] = False
-            st.toast("Re-training model with new feature set...", icon="🔄")
+            st.toast("Re-training model with new feature set...", icon="[Refresh]")
 
 # The model ALWAYS uses the 'confirmed' set for calculation
 selected_features = st.session_state['confirmed_features']
@@ -244,7 +244,7 @@ def evaluate_custom_features(ticker_input, exchange, selected_features):
             df_1d['DateStr'] = pd.to_datetime(df_1d['Datetime']).dt.strftime('%Y-%m-%d')
             
         if 'Close' in df_1d.columns and len(df_1d) >= 14:
-            df_1d['Daily_SMA_5'] = df_1d['Close'].rolling(window=5).mean()
+            df_1d['Anchored_Close_Return_5'] = (df_1d['Close'] - df_1d['Close'].shift(5)) / df_1d['Close'].shift(5)
             df_1d['Daily_ATR_14'] = df_1d.ta.atr(length=14)
             df_1d['Daily_RSI_14'] = df_1d.ta.rsi(length=14)
             
@@ -284,11 +284,11 @@ def evaluate_custom_features(ticker_input, exchange, selected_features):
         df['OBV'] = (obv_sign * df['Volume']).cumsum()
         df['OBV_Slope'] = df['OBV'].diff(14) / df['Volume'].rolling(window=14, min_periods=5).mean()
         
-        daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
+        daily_cols = ['DateStr', 'Anchored_Close_Return_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
         merge_cols = [c for c in daily_cols if c in df_1d.columns]
         
         # Shift daily features by 1 day to prevent intraday data leakage
-        cols_to_shift = ['Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']
+        cols_to_shift = ['Anchored_Close_Return_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']
         for c in cols_to_shift:
             if c in df_1d.columns:
                 df_1d[c] = df_1d[c].shift(1)
@@ -300,7 +300,6 @@ def evaluate_custom_features(ticker_input, exchange, selected_features):
             if col != 'DateStr':
                 df[col] = df[col].ffill()
         
-        df['Distance_to_Fast_SMA'] = (df['Close'] - df['Daily_SMA_5']) / df['Daily_SMA_5']
         df['ATR_Percent'] = df['Daily_ATR_14'] / df['Close']
         
         df['Typical_Price'] = (df['High'] + df['Low'] + df['Close']) / 3
@@ -429,9 +428,9 @@ def evaluate_custom_features(ticker_input, exchange, selected_features):
                     date_label = date_to_next_date.get(feature_date, feature_date)
                     
                     if is_correct:
-                        eval_results.append(f"<li style='margin-bottom: 4px;'><span style='color: #00C073;'>✅ {date_label}: Validated (Predicted {pred_lbl})</span></li>")
+                        eval_results.append(f"<li style='margin-bottom: 4px;'><span style='color: #00C073;'>[OK] {date_label}: Validated (Predicted {pred_lbl})</span></li>")
                     else:
-                        eval_results.append(f"<li style='margin-bottom: 4px;'><span style='color: #FF2B2B;'>❌ {date_label}: Failed (Pred {pred_lbl} ≠ Act {actual_lbl})</span></li>")
+                        eval_results.append(f"<li style='margin-bottom: 4px;'><span style='color: #FF2B2B;'>[X] {date_label}: Failed (Pred {pred_lbl} != Act {actual_lbl})</span></li>")
                         
                 eval_results.reverse()
                 val_count = len(eval_results)
@@ -530,7 +529,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                 df_1d['DateStr'] = pd.to_datetime(df_1d['Datetime']).dt.strftime('%Y-%m-%d')
                 
             if 'Close' in df_1d.columns and len(df_1d) >= 14:
-                df_1d['Daily_SMA_5'] = df_1d['Close'].rolling(window=5).mean()
+                df_1d['Anchored_Close_Return_5'] = (df_1d['Close'] - df_1d['Close'].shift(5)) / df_1d['Close'].shift(5)
                 df_1d['Daily_ATR_14'] = df_1d.ta.atr(length=14)
                 df_1d['Daily_RSI_14'] = df_1d.ta.rsi(length=14)
                 
@@ -576,11 +575,11 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
             df['OBV_Slope'] = df['OBV'].diff(14) / df['Volume'].rolling(window=14, min_periods=5).mean()
             
             # 3. MERGE DAILY DATA (Stock + NIFTY Macro)
-            daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
+            daily_cols = ['DateStr', 'Anchored_Close_Return_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
             merge_cols = [c for c in daily_cols if c in df_1d.columns]
             
             # Shift daily features by 1 day to prevent intraday data leakage
-            cols_to_shift = ['Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']
+            cols_to_shift = ['Anchored_Close_Return_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']
             for c in cols_to_shift:
                 if c in df_1d.columns:
                     df_1d[c] = df_1d[c].shift(1)
@@ -593,7 +592,6 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                 if col != 'DateStr':
                     df[col] = df[col].ffill()
             
-            df['Distance_to_Fast_SMA'] = (df['Close'] - df['Daily_SMA_5']) / df['Daily_SMA_5']
             df['ATR_Percent'] = df['Daily_ATR_14'] / df['Close']
             
             # 3.5 ADVANCED INTRADAY FEATURES
@@ -750,9 +748,9 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                         date_label = date_to_next_date.get(feature_date, feature_date)
                         
                         if is_correct:
-                            eval_results.append(f"<li style='margin-bottom: 4px;'><span style='color: #00C073;'>✅ {date_label}: Validated (Predicted {pred_lbl})</span></li>")
+                            eval_results.append(f"<li style='margin-bottom: 4px;'><span style='color: #00C073;'>[OK] {date_label}: Validated (Predicted {pred_lbl})</span></li>")
                         else:
-                            eval_results.append(f"<li style='margin-bottom: 4px;'><span style='color: #FF2B2B;'>❌ {date_label}: Failed (Pred {pred_lbl} ≠ Act {actual_lbl})</span></li>")
+                            eval_results.append(f"<li style='margin-bottom: 4px;'><span style='color: #FF2B2B;'>[X] {date_label}: Failed (Pred {pred_lbl} != Act {actual_lbl})</span></li>")
                             
                     eval_results.reverse() # Show oldest to newest
                     
@@ -855,7 +853,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
             latest_day = df.iloc[-1]
             
             cols = st.columns(6)
-            close_val = f"₹{latest_day['Close']:.2f}" if 'Close' in df.columns and pd.notna(latest_day['Close']) else "N/A"
+            close_val = f"Rs.{latest_day['Close']:.2f}" if 'Close' in df.columns and pd.notna(latest_day['Close']) else "N/A"
             render_indicator(cols[0], "Current Close", close_val, "#1D4ED8")
             
             mom_v = latest_day['Closing_Momentum'] if 'Closing_Momentum' in latest_day else float('nan')
@@ -866,9 +864,9 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
             obv_str = f"{obv_v:+.2f}" if pd.notna(obv_v) else "N/A"
             render_indicator(cols[2], "OBV Slope", obv_str)
             
-            sma_dist = latest_day['Distance_to_Fast_SMA'] if 'Distance_to_Fast_SMA' in latest_day else float('nan')
-            sma_str = f"{sma_dist*100:+.2f}%" if pd.notna(sma_dist) else "N/A"
-            render_indicator(cols[3], "Dist to SMA5", sma_str)
+            anchor_cr5 = latest_day['Anchored_Close_Return_5'] if 'Anchored_Close_Return_5' in latest_day else float('nan')
+            anchor_cr5_str = f"{anchor_cr5*100:+.2f}%" if pd.notna(anchor_cr5) else "N/A"
+            render_indicator(cols[3], "Anchored CR5", anchor_cr5_str)
             
             atr_v = latest_day['ATR_Percent'] if 'ATR_Percent' in latest_day else float('nan')
             atr_str = f"{atr_v*100:.2f}%" if pd.notna(atr_v) else "N/A"
@@ -968,7 +966,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                         trained_sessions = ml_details['samples']
                         st.markdown(
                             f"**Valid Hourly Training Intervals:** {trained_sessions} market sessions "
-                            f"<span style='color:#888; font-size:0.9em;'>({raw_sessions} total calendar sessions fetched — "
+                            f"<span style='color:#888; font-size:0.9em;'>({raw_sessions} total calendar sessions fetched -- "
                             f"difference accounts for weekends, NSE holidays, circuit-breaker days with missing candles, and rolling-indicator warmup)</span>",
                             unsafe_allow_html=True
                         )
@@ -1011,7 +1009,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                         display_df = display_df.set_index('DateStr')
                         st.dataframe(display_df, use_container_width=True)
                     
-                    with st.expander("🔍 View Feature Snapshot (Prediction Input)", expanded=False):
+                    with st.expander("[View] View Feature Snapshot (Prediction Input)", expanded=False):
                         feat_day_str = st.session_state.get('feature_day_str', df['DateStr'].iloc[-1])
                         train_end_str = st.session_state.get('training_end_day_str', df['DateStr'].iloc[-1])
                         
@@ -1027,7 +1025,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                             snapshot_df.index.name = "Ticker"
                             st.dataframe(snapshot_df.T.rename(columns={snapshot_df.index[0]: "Value"}).style.format("{:.4f}"), use_container_width=True)
                         else:
-                            st.warning("Feature snapshot is unavailable — today's data may still be loading.")
+                            st.warning("Feature snapshot is unavailable -- today's data may still be loading.")
                         
             with st.expander(f"View Latest Market News on {symbol}", expanded=False):
                 news_articles = get_top_news(ticker_input)
@@ -1042,7 +1040,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                 else:
                     st.markdown("<p style='color: #888;'>No recent news articles found for this ticker.</p>", unsafe_allow_html=True)
             
-            with st.expander(f"🔮 View Munafa Sutra Prediction for {symbol}", expanded=False):
+            with st.expander(f"[Prediction] View Munafa Sutra Prediction for {symbol}", expanded=False):
                 with st.spinner("Fetching prediction from Munafa Sutra..."):
                     munafa_pred = fetch_munafasutra_prediction(ticker_input).replace('\n', '<br>')
                     st.markdown(f"<div style='padding:1rem; border-radius:8px; background-color:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05);'><p style='color: black; font-size: 1rem; line-height: 1.6;'>{munafa_pred}</p></div>", unsafe_allow_html=True)
@@ -1052,7 +1050,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                 import traceback
                 st.error(f"An error occurred while fetching data: {e}\n\nTraceback: {traceback.format_exc()}")
 
-with st.expander("📂 Batch Watchlist Import", expanded=False):
+with st.expander("[Batch] Batch Watchlist Import", expanded=False):
     st.markdown("Upload a `.txt` file with one stock ticker per line. The model will run on each ticker using the currently selected features and add results to the watchlist.")
     batch_uploaded_file = st.file_uploader("Select ticker file", type=["txt"], key="batch_upload")
     if batch_uploaded_file is not None:
@@ -1060,7 +1058,7 @@ with st.expander("📂 Batch Watchlist Import", expanded=False):
         batch_tickers = [line.strip().upper() for line in batch_tickers_raw if line.strip()]
         if batch_tickers:
             st.caption(f"{len(batch_tickers)} tickers detected: {', '.join(batch_tickers[:10])}{'...' if len(batch_tickers) > 10 else ''}")
-            if st.button(f"▶ Run Model on {len(batch_tickers)} Tickers & Add to Watchlist", type="primary"):
+            if st.button(f"> Run Model on {len(batch_tickers)} Tickers & Add to Watchlist", type="primary"):
                 batch_progress = st.progress(0)
                 batch_status = st.empty()
                 for i, t in enumerate(batch_tickers):
@@ -1074,10 +1072,10 @@ with st.expander("📂 Batch Watchlist Import", expanded=False):
         else:
             st.warning("The uploaded file appears to be empty or has no valid ticker names.")
 
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Main Dashboard", "⭐ Watchlist", "🔬 Backtest JSON", "📖 Feature Glossary"])
+tab1, tab2, tab3, tab4 = st.tabs(["[Indicator] Main Dashboard", "* Watchlist", "[Test] Backtest JSON", "[Glossary] Feature Glossary"])
 
 with tab3:
-    st.markdown("### 🔬 Evaluate Custom Feature Sets")
+    st.markdown("### [Test] Evaluate Custom Feature Sets")
     st.markdown("Upload a feature combination JSON file generated by the brute force search to see their respective evaluations side-by-side.")
     
     uploaded_file = st.file_uploader("Upload optimal_features.json", type=['json'])
@@ -1137,13 +1135,13 @@ with tab3:
             
     st.markdown("<hr style='margin-top: 15px; margin-bottom: 15px;'>", unsafe_allow_html=True)
     
-    with st.expander("📂 Batch JSON Evaluator & Exporter", expanded=False):
+    with st.expander("[Batch] Batch JSON Evaluator & Exporter", expanded=False):
         st.markdown("Upload multiple `.json` files to automatically compile their top optimal evaluations into a single downloadable Excel report.")
         
         batch_jsons = st.file_uploader("Select multiple optimal JSON files", type=["json"], accept_multiple_files=True, key="batch_json_upload")
         
         if batch_jsons:
-            if st.button("▶ Run Batch Evaluation on All Files", type="primary"):
+            if st.button("> Run Batch Evaluation on All Files", type="primary"):
                 compiled_results = []
                 batch_progress = st.progress(0)
                 batch_status = st.empty()
@@ -1212,7 +1210,7 @@ with tab3:
                             worksheet.column_dimensions[column].width = adjusted_width
 
                     st.download_button(
-                        label="📥 Download Excel Report",
+                        label="[Load] Download Excel Report",
                         data=buffer.getvalue(),
                         file_name=f"Batch_Evaluations_{pd.Timestamp.today().strftime('%Y_%m_%d')}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -1223,10 +1221,10 @@ with tab3:
 if ticker_input:
     with tab1:
         if not selected_features:
-            st.warning("⚠️ Please select at least one feature in 'Advanced Model Settings' to train the model.")
+            st.warning("[!] Please select at least one feature in 'Advanced Model Settings' to train the model.")
         elif st.session_state.get('skip_render', False):
             # Show a helpful reminder that calculation hasn't run yet if skip_render is true
-            st.info("💡 Selection updated. Dashboard will refresh automatically on your next re-train or search.")
+            st.info("[i] Selection updated. Dashboard will refresh automatically on your next re-train or search.")
         else:
             render_main_dashboard(ticker_input, exchange, selected_features)
 
@@ -1234,7 +1232,7 @@ if ticker_input:
 st.session_state['skip_render'] = False
 
 with tab2:
-    st.markdown("### ⭐ Saved Watchlist")
+    st.markdown("### * Saved Watchlist")
     
     today_ist = pd.Timestamp.today(tz='Asia/Kolkata')
     
@@ -1290,7 +1288,7 @@ with tab2:
     if st.session_state['watchlist']:
         excel_data = export_watchlist_to_excel(st.session_state['watchlist'])
         st.download_button(
-            label="📥",
+            label="[Load]",
             data=excel_data,
             file_name=f"Stock_Watchlist_{today_ist.strftime('%Y_%m_%d')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1359,7 +1357,7 @@ with tab2:
             """, unsafe_allow_html=True)
 
 with tab4:
-    st.markdown("### 📖 Feature Glossary")
+    st.markdown("### [Glossary] Feature Glossary")
     st.markdown("A plain-language guide to every feature the model can use. Understanding these helps you interpret the prediction and tune feature selection.")
     st.markdown("<hr style='margin-top: 5px; margin-bottom: 1.5rem;'>", unsafe_allow_html=True)
 
@@ -1367,145 +1365,145 @@ with tab4:
         {
             "name": "Closing Momentum",
             "col": "Closing_Momentum",
-            "icon": "📈",
+            "icon": "M",
             "what": "Measures how much the price moved within a single 1-hour candle, expressed as a percentage of the open price.",
-            "formula": "(Close − Open) / Open",
-            "positive": "The candle closed higher than it opened — buyers dominated that hour.",
-            "negative": "The candle closed lower than it opened — sellers dominated that hour.",
-            "high": "A large absolute value (e.g. ±2%+) means a strong directional move happened in that hour — high conviction from one side.",
-            "low": "Near zero means the candle was indecisive — open and close were almost the same (doji-like).",
+            "formula": "(Close - Open) / Open",
+            "positive": "The candle closed higher than it opened -- buyers dominated that hour.",
+            "negative": "The candle closed lower than it opened -- sellers dominated that hour.",
+            "high": "A large absolute value (e.g. +/-2%+) means a strong directional move happened in that hour -- high conviction from one side.",
+            "low": "Near zero means the candle was indecisive -- open and close were almost the same (doji-like).",
         },
         {
             "name": "OBV Slope",
             "col": "OBV_Slope",
-            "icon": "⚖️",
+            "icon": "S",
             "what": "Tracks the direction of On Balance Volume (OBV) over 14 periods. OBV adds volume on up-candles and subtracts it on down-candles. The slope tells you if smart money is accumulating or distributing, normalized by average volume so it's comparable across stocks.",
             "formula": "OBV.diff(14) / Volume.rolling(14).mean()",
-            "positive": "OBV is rising — net volume flow is into the stock (accumulation). Institutions are likely buying.",
-            "negative": "OBV is falling — net volume flow is out of the stock (distribution). Institutions are likely selling.",
-            "high": "A large positive value (e.g. +3) means OBV surged upward by 3× the average volume over 14 periods — very strong accumulation.",
-            "low": "A large negative value (e.g. −3) means heavy distribution. Values near zero mean volume flow is balanced with no clear directional intent.",
+            "positive": "OBV is rising -- net volume flow is into the stock (accumulation). Institutions are likely buying.",
+            "negative": "OBV is falling -- net volume flow is out of the stock (distribution). Institutions are likely selling.",
+            "high": "A large positive value (e.g. +3) means OBV surged upward by 3x the average volume over 14 periods -- very strong accumulation.",
+            "low": "A large negative value (e.g. -3) means heavy distribution. Values near zero mean volume flow is balanced with no clear directional intent.",
         },
         {
-            "name": "Dist to SMA5",
-            "col": "Distance_to_Fast_SMA",
-            "icon": "📏",
-            "what": "How far the current price is from its 5-day Simple Moving Average, as a percentage. This is a mean-reversion signal — prices tend to return to their short-term average.",
-            "formula": "(Close − SMA5) / SMA5",
-            "positive": "Price is above its 5-day average — the stock is in a short-term uptrend or potentially overextended.",
-            "negative": "Price is below its 5-day average — the stock is in a short-term downtrend or potentially oversold.",
-            "high": "A value like +3% means the stock is stretched well above its recent average — it may snap back down.",
-            "low": "A value like −3% means the stock is stretched well below average — it may bounce back up.",
+            "name": "Anchored CR5",
+            "col": "Anchored_Close_Return_5",
+            "icon": "A",
+            "what": "The exact percentage return of the current price relative to the closing price from 5 trading days ago. Unlike a moving average, this anchors to a single rigid historical level -- giving the model an un-smoothed structural reference point.",
+            "formula": "(Close_t - Close_t-5) / Close_t-5",
+            "positive": "Price has risen over the past 5 days -- the stock is in a short-term uptrend relative to its exact anchor.",
+            "negative": "Price has fallen over the past 5 days -- the stock is in a short-term downtrend relative to its exact anchor.",
+            "high": "A value like +5% means a strong 5-day rally. Algorithmic traders may view this as overextension from structure.",
+            "low": "A value like -5% means a sharp 5-day decline. May signal oversold conditions relative to the structural anchor.",
         },
         {
             "name": "ATR %",
             "col": "ATR_Percent",
-            "icon": "🌊",
-            "what": "The 14-day Average True Range expressed as a percentage of the current price. Measures how volatile the stock is — higher ATR% means bigger daily swings.",
+            "icon": "V",
+            "what": "The 14-day Average True Range expressed as a percentage of the current price. Measures how volatile the stock is -- higher ATR% means bigger daily swings.",
             "formula": "ATR(14) / Close",
             "positive": "Always positive. This is a magnitude-only indicator.",
-            "negative": "N/A — this value is always positive.",
+            "negative": "N/A -- this value is always positive.",
             "high": "High values (e.g. 4%+) mean the stock swings a lot day-to-day. More volatile = riskier but potentially more profitable for directional bets.",
-            "low": "Low values (e.g. <1%) mean the stock barely moves. Calm, low-volatility regime — smaller profit potential per trade.",
+            "low": "Low values (e.g. <1%) mean the stock barely moves. Calm, low-volatility regime -- smaller profit potential per trade.",
         },
         {
             "name": "Daily RSI",
             "col": "Daily_RSI_14",
-            "icon": "🔥",
+            "icon": "R",
             "what": "The 14-day Relative Strength Index. Classic momentum oscillator that ranges from 0 to 100. Measures if a stock has been overbought or oversold recently.",
             "formula": "RSI(14) on daily closes",
-            "positive": "N/A — RSI is always between 0 and 100.",
-            "negative": "N/A — RSI is always between 0 and 100.",
-            "high": "Above 70 → Overbought. The stock has risen a lot recently and may be due for a pullback.",
-            "low": "Below 30 → Oversold. The stock has fallen a lot recently and may be due for a bounce. Between 40–60 is neutral territory.",
+            "positive": "N/A -- RSI is always between 0 and 100.",
+            "negative": "N/A -- RSI is always between 0 and 100.",
+            "high": "Above 70 -> Overbought. The stock has risen a lot recently and may be due for a pullback.",
+            "low": "Below 30 -> Oversold. The stock has fallen a lot recently and may be due for a bounce. Between 40-60 is neutral territory.",
         },
         {
             "name": "VWAP Dist",
             "col": "VWAP_Distance",
-            "icon": "⚡",
+            "icon": "V",
             "what": "How far the current price is from the intraday Volume Weighted Average Price (VWAP). VWAP is the \"fair price\" institutional traders benchmark against.",
-            "formula": "(Close − VWAP) / VWAP",
-            "positive": "Price is above VWAP — buyers are in control and willing to pay more than the average traded price today.",
-            "negative": "Price is below VWAP — sellers are in control. Institutions may view the stock as expensive relative to today's volume.",
+            "formula": "(Close - VWAP) / VWAP",
+            "positive": "Price is above VWAP -- buyers are in control and willing to pay more than the average traded price today.",
+            "negative": "Price is below VWAP -- sellers are in control. Institutions may view the stock as expensive relative to today's volume.",
             "high": "A large positive distance means strong bullish intraday momentum. The stock is trading well above its volume-weighted average.",
             "low": "A large negative distance means strong bearish intraday pressure. Near zero means price is trading at fair value.",
         },
         {
             "name": "OFI (Order Flow)",
             "col": "OFI",
-            "icon": "🔄",
-            "what": "Order Flow Imbalance — estimates whether buyers or sellers dominated each candle based on where the close falls within the high-low range, smoothed over 5 periods.",
-            "formula": "((Close−Low) − (High−Close)) / (High−Low), rolled over 5 candles",
-            "positive": "Close is consistently near the high of each candle — buyers are absorbing all selling pressure (bullish flow).",
-            "negative": "Close is consistently near the low — sellers are overwhelming buyers (bearish flow).",
-            "high": "Near +1.0 means almost every recent candle closed at its high — extreme buying pressure.",
-            "low": "Near −1.0 means every recent candle closed at its low — extreme selling pressure. Near 0 means balanced, tug-of-war action.",
+            "icon": "[Refresh]",
+            "what": "Order Flow Imbalance -- estimates whether buyers or sellers dominated each candle based on where the close falls within the high-low range, smoothed over 5 periods.",
+            "formula": "((Close-Low) - (High-Close)) / (High-Low), rolled over 5 candles",
+            "positive": "Close is consistently near the high of each candle -- buyers are absorbing all selling pressure (bullish flow).",
+            "negative": "Close is consistently near the low -- sellers are overwhelming buyers (bearish flow).",
+            "high": "Near +1.0 means almost every recent candle closed at its high -- extreme buying pressure.",
+            "low": "Near -1.0 means every recent candle closed at its low -- extreme selling pressure. Near 0 means balanced, tug-of-war action.",
         },
         {
             "name": "Frac Diff (Memory)",
             "col": "Frac_Diff_Close",
-            "icon": "🧠",
+            "icon": "M",
             "what": "Fractionally Differenced Close price (d=0.4). A technique from Lopez de Prado that makes the price series stationary for ML while preserving long-term memory. Unlike simple returns that forget history, this retains trend information.",
             "formula": "FFD(Close, d=0.4)",
-            "positive": "The memory-preserving transformation is trending upward — the stock has persistent bullish momentum with historical context.",
-            "negative": "The transformation is trending downward — persistent bearish momentum.",
+            "positive": "The memory-preserving transformation is trending upward -- the stock has persistent bullish momentum with historical context.",
+            "negative": "The transformation is trending downward -- persistent bearish momentum.",
             "high": "Large absolute values indicate the stock is in a strong, sustained trend (the memory effect amplifies persistent moves).",
             "low": "Small values near zero indicate the stock is range-bound or the trend has stalled.",
         },
         {
             "name": "Nifty Momentum",
             "col": "Nifty_Momentum",
-            "icon": "🇮🇳",
+            "icon": "N",
             "what": "The daily open-to-close return of the NIFTY 50 index. Captures the broad market sentiment in India for that day.",
-            "formula": "(NIFTY Close − NIFTY Open) / NIFTY Open",
-            "positive": "The broad Indian market closed up that day — bullish macro sentiment. Individual stocks tend to follow.",
-            "negative": "The broad market closed down — bearish macro sentiment. Headwind for individual long positions.",
+            "formula": "(NIFTY Close - NIFTY Open) / NIFTY Open",
+            "positive": "The broad Indian market closed up that day -- bullish macro sentiment. Individual stocks tend to follow.",
+            "negative": "The broad market closed down -- bearish macro sentiment. Headwind for individual long positions.",
             "high": "A value like +1.5% means the market had a strong rally day. Most stocks benefit from this tailwind.",
-            "low": "A value like −1.5% means a broad sell-off. Even fundamentally strong stocks can get dragged down.",
+            "low": "A value like -1.5% means a broad sell-off. Even fundamentally strong stocks can get dragged down.",
         },
         {
             "name": "Nifty RSI",
             "col": "Nifty_RSI_14",
-            "icon": "📊",
+            "icon": "[Indicator]",
             "what": "The 14-day RSI of the NIFTY 50 index. Tells you if the overall Indian market is overbought or oversold.",
             "formula": "RSI(14) on NIFTY 50 daily closes",
-            "positive": "N/A — always between 0 and 100.",
-            "negative": "N/A — always between 0 and 100.",
-            "high": "Above 70 → The entire market has been rallying hard and may be due for a correction. Risk of mean-reversion is elevated.",
-            "low": "Below 30 → The entire market is deeply oversold — historically a contrarian buy signal for the broader market.",
+            "positive": "N/A -- always between 0 and 100.",
+            "negative": "N/A -- always between 0 and 100.",
+            "high": "Above 70 -> The entire market has been rallying hard and may be due for a correction. Risk of mean-reversion is elevated.",
+            "low": "Below 30 -> The entire market is deeply oversold -- historically a contrarian buy signal for the broader market.",
         },
         {
             "name": "Nifty Trend",
             "col": "Nifty_Trend_Dist",
-            "icon": "📐",
+            "icon": "T",
             "what": "How far the NIFTY 50 is from its 20-day Exponential Moving Average. Measures whether the broad market is extended or at equilibrium.",
-            "formula": "(NIFTY Close − EMA20) / EMA20",
-            "positive": "NIFTY is trading above its 20-day trend — the macro environment is bullish.",
-            "negative": "NIFTY is below its 20-day trend — the macro environment is bearish.",
-            "high": "A value like +3% means the market is significantly stretched above trend — potential for a pullback.",
-            "low": "A value like −3% means the market is significantly below trend — potential for a relief rally.",
+            "formula": "(NIFTY Close - EMA20) / EMA20",
+            "positive": "NIFTY is trading above its 20-day trend -- the macro environment is bullish.",
+            "negative": "NIFTY is below its 20-day trend -- the macro environment is bearish.",
+            "high": "A value like +3% means the market is significantly stretched above trend -- potential for a pullback.",
+            "low": "A value like -3% means the market is significantly below trend -- potential for a relief rally.",
         },
         {
             "name": "Morning Autocorr",
             "col": "Morning_Autocorr",
-            "icon": "🌅",
+            "icon": "M",
             "what": "The return from market open (9:15 AM) to 10:15 AM, expressed as a percentage. Captures the early-morning directional bias. Autocorrelation in morning moves can predict the rest of the day.",
-            "formula": "(Close at 10:15 − Open at 9:15) / Open at 9:15",
-            "positive": "The stock rallied in the first hour — morning buyers were aggressive. This momentum often carries forward.",
-            "negative": "The stock sold off in the first hour — morning sellers dominated. Negative autocorrelation may signal continued weakness.",
-            "high": "A large positive value (e.g. +2%) means a strong opening rally — high conviction from early participants.",
+            "formula": "(Close at 10:15 - Open at 9:15) / Open at 9:15",
+            "positive": "The stock rallied in the first hour -- morning buyers were aggressive. This momentum often carries forward.",
+            "negative": "The stock sold off in the first hour -- morning sellers dominated. Negative autocorrelation may signal continued weakness.",
+            "high": "A large positive value (e.g. +2%) means a strong opening rally -- high conviction from early participants.",
             "low": "A large negative value means a sharp morning sell-off. Near zero means a flat, indecisive open.",
         },
         {
             "name": "US Overnight Ret",
             "col": "US_Overnight_Return",
-            "icon": "🇺🇸",
+            "icon": "U",
             "what": "The previous day's S&P 500 daily return. Since US markets close after Indian markets, this captures the overnight global sentiment that Indian markets will react to the next morning.",
             "formula": "S&P 500 daily return, shifted forward by 1 day",
-            "positive": "The US market closed up overnight — typically a bullish tailwind for Indian markets at the open.",
-            "negative": "The US market closed down overnight — typically a bearish headwind. Indian markets often gap down following US sell-offs.",
-            "high": "A value like +2% means a strong US rally — expect a positive gap-up in Indian markets.",
-            "low": "A value like −2% means a sharp US sell-off — expect a negative gap-down. Near zero means neutral overnight sentiment.",
+            "positive": "The US market closed up overnight -- typically a bullish tailwind for Indian markets at the open.",
+            "negative": "The US market closed down overnight -- typically a bearish headwind. Indian markets often gap down following US sell-offs.",
+            "high": "A value like +2% means a strong US rally -- expect a positive gap-up in Indian markets.",
+            "low": "A value like -2% means a sharp US sell-off -- expect a negative gap-down. Near zero means neutral overnight sentiment.",
         },
     ]
 
@@ -1526,7 +1524,7 @@ with tab4:
                     <p style="margin: 0; font-size: 0.85rem; color: #333;">{entry['positive']}</p>
                 </div>
                 <div style="flex: 1; min-width: 220px; padding: 8px 12px; border-radius: 6px; background-color: rgba(255, 43, 43, 0.08); border-left: 3px solid #FF2B2B;">
-                    <p style="margin: 0 0 2px 0; font-size: 0.75rem; font-weight: 700; color: #FF2B2B; text-transform: uppercase;">Negative (−)</p>
+                    <p style="margin: 0 0 2px 0; font-size: 0.75rem; font-weight: 700; color: #FF2B2B; text-transform: uppercase;">Negative (-)</p>
                     <p style="margin: 0; font-size: 0.85rem; color: #333;">{entry['negative']}</p>
                 </div>
             </div>

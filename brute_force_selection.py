@@ -20,7 +20,7 @@ from sklearn.base import clone
 FEATURE_MAP = {
     "Closing Momentum": 'Closing_Momentum',
     "OBV Slope": 'OBV_Slope',
-    "Dist to SMA5": 'Distance_to_Fast_SMA',
+    "Anchored CR5": 'Anchored_Close_Return_5',
     "ATR %": 'ATR_Percent',
     "Daily RSI": 'Daily_RSI_14',
     "VWAP Dist": 'VWAP_Distance',
@@ -113,7 +113,7 @@ def prepare_data(ticker, exchange):
         df_1d['DateStr'] = pd.to_datetime(df_1d['Datetime']).dt.strftime('%Y-%m-%d')
         
     if 'Close' in df_1d.columns and len(df_1d) >= 14:
-        df_1d['Daily_SMA_5'] = df_1d['Close'].rolling(window=5).mean()
+        df_1d['Anchored_Close_Return_5'] = (df_1d['Close'] - df_1d['Close'].shift(5)) / df_1d['Close'].shift(5)
         df_1d['Daily_ATR_14'] = df_1d.ta.atr(length=14)
         df_1d['Daily_RSI_14'] = df_1d.ta.rsi(length=14)
         
@@ -153,11 +153,11 @@ def prepare_data(ticker, exchange):
     df['OBV'] = (obv_sign * df['Volume']).cumsum()
     df['OBV_Slope'] = df['OBV'].diff(14) / df['Volume'].rolling(window=14, min_periods=5).mean()
     
-    daily_cols = ['DateStr', 'Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
+    daily_cols = ['DateStr', 'Anchored_Close_Return_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist', 'US_Overnight_Return']
     merge_cols = [c for c in daily_cols if c in df_1d.columns]
     
     # Shift daily features by 1 day to prevent intraday data leakage
-    cols_to_shift = ['Daily_SMA_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']
+    cols_to_shift = ['Anchored_Close_Return_5', 'Daily_ATR_14', 'Daily_RSI_14', 'Nifty_Momentum', 'Nifty_RSI_14', 'Nifty_Trend_Dist']
     for c in cols_to_shift:
         if c in df_1d.columns:
             df_1d[c] = df_1d[c].shift(1)
@@ -169,7 +169,6 @@ def prepare_data(ticker, exchange):
         if col != 'DateStr':
             df[col] = df[col].ffill()
     
-    df['Distance_to_Fast_SMA'] = (df['Close'] - df['Daily_SMA_5']) / df['Daily_SMA_5']
     df['ATR_Percent'] = df['Daily_ATR_14'] / df['Close']
     
     df['Typical_Price'] = (df['High'] + df['Low'] + df['Close']) / 3
