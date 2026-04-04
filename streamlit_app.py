@@ -887,10 +887,12 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                     prediction_ts = last_df_date
                     forecast_title = f"AMO Current Day Forecast ({prediction_ts.strftime('%A, %b %d, %Y')})"
                 else:
-                    prediction_ts = last_df_date + pd.Timedelta(days=1)
-                    if prediction_ts.weekday() == 5:
-                        prediction_ts += pd.Timedelta(days=2)
-                    elif prediction_ts.weekday() == 6:
+                    # Use the later of today or last data date as the base,
+                    # then find the next weekday (Mon-Fri) after it.
+                    today_date = pd.Timestamp.today(tz='Asia/Kolkata').normalize().tz_localize(None)
+                    base_date = max(last_df_date, today_date)
+                    prediction_ts = base_date + pd.Timedelta(days=1)
+                    while prediction_ts.weekday() >= 5:  # 5=Sat, 6=Sun
                         prediction_ts += pd.Timedelta(days=1)
                     forecast_title = f"AMO Next Day Forecast ({prediction_ts.strftime('%A, %b %d, %Y')})"
                     
@@ -1278,8 +1280,8 @@ with tab2:
     if 'last_data_date' not in st.session_state:
         # Fallback if app just loaded without main dashboard run
         prediction_ts = prediction_ts + pd.Timedelta(days=1)
-        if prediction_ts.weekday() == 5: prediction_ts += pd.Timedelta(days=2)
-        elif prediction_ts.weekday() == 6: prediction_ts += pd.Timedelta(days=1)
+        while prediction_ts.weekday() >= 5:  # 5=Sat, 6=Sun
+            prediction_ts += pd.Timedelta(days=1)
 
     global_next_day_str = prediction_ts.strftime('%A, %b %d, %Y')
     forecast_text = "current active AMO session" if forecast_type == "Current Day" else "next active AMO session"
