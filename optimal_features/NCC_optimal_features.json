@@ -1,46 +1,42 @@
 {
-    "ticker": "REDINGTON",
+    "ticker": "NCC",
     "exchange": "NSE",
     "top_combinations": [
         {
             "rank": 1,
-            "accuracy": 0.6737,
+            "accuracy": 0.6526,
             "features": [
-                "Closing_Momentum",
-                "Distance_to_Fast_SMA",
-                "ATR_Percent",
-                "Daily_RSI_14",
-                "OFI",
+                "OBV_Slope",
                 "Nifty_RSI_14",
-                "Nifty_Trend_Dist"
+                "Gap_Percentage",
+                "US_Overnight_Return"
             ],
             "dataset_rows": 473,
             "out_of_sample_size": 95
         },
         {
             "rank": 2,
-            "accuracy": 0.6737,
+            "accuracy": 0.6526,
             "features": [
-                "Closing_Momentum",
-                "Distance_to_Fast_SMA",
-                "ATR_Percent",
+                "OBV_Slope",
+                "VWAP_Distance",
                 "OFI",
                 "Nifty_Momentum",
                 "Nifty_RSI_14",
-                "Nifty_Trend_Dist"
+                "US_Overnight_Return"
             ],
             "dataset_rows": 473,
             "out_of_sample_size": 95
         },
         {
             "rank": 3,
-            "accuracy": 0.6632,
+            "accuracy": 0.6421,
             "features": [
-                "Closing_Momentum",
-                "Distance_to_Fast_SMA",
+                "VWAP_Distance",
                 "OFI",
-                "Frac_Diff_Close",
-                "Gap_Percentage"
+                "Nifty_Trend_Dist",
+                "Gap_Percentage",
+                "US_Overnight_Return"
             ],
             "dataset_rows": 473,
             "out_of_sample_size": 95

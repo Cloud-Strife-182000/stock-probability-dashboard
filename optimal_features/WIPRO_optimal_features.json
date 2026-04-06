@@ -1,16 +1,14 @@
 {
-    "ticker": "CENTRALBK",
+    "ticker": "WIPRO",
     "exchange": "NSE",
     "top_combinations": [
         {
             "rank": 1,
             "accuracy": 0.6421,
             "features": [
-                "Distance_to_Fast_SMA",
-                "Daily_RSI_14",
-                "Frac_Diff_Close",
-                "Nifty_Momentum",
-                "Nifty_RSI_14"
+                "Closing_Momentum",
+                "OBV_Slope",
+                "ATR_Percent"
             ],
             "dataset_rows": 473,
             "out_of_sample_size": 95
@@ -19,10 +17,8 @@
             "rank": 2,
             "accuracy": 0.6316,
             "features": [
-                "Distance_to_Fast_SMA",
-                "OFI",
-                "Frac_Diff_Close",
-                "Nifty_Momentum"
+                "Gap_Percentage",
+                "US_Overnight_Return"
             ],
             "dataset_rows": 473,
             "out_of_sample_size": 95
@@ -31,12 +27,12 @@
             "rank": 3,
             "accuracy": 0.6211,
             "features": [
-                "Distance_to_Fast_SMA",
+                "Closing_Momentum",
+                "OBV_Slope",
                 "Daily_RSI_14",
-                "Nifty_Momentum",
-                "Nifty_RSI_14"
+                "VWAP_Distance"
             ],
-            "dataset_rows": 473,
+            "dataset_rows": 472,
             "out_of_sample_size": 95
         }
     ]

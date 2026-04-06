@@ -101,7 +101,10 @@ def get_top_news(ticker):
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_munafasutra_prediction(ticker):
-    """Fetch predictive text from MunafaSutra."""
+    """Fetch structured prediction data from MunafaSutra.
+    Returns a dict with keys: url, ai_prediction, ai_prediction_note, dialogue.
+    """
+    import re
     try:
         import requests
         from bs4 import BeautifulSoup
@@ -111,27 +114,37 @@ def fetch_munafasutra_prediction(ticker):
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
         resp = requests.get(url, headers=headers, timeout=5)
         
+        result = {"url": url, "ai_prediction": None, "ai_prediction_note": None, "dialogue": []}
+        
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.text, 'html.parser')
-            paragraphs = soup.find_all('p')
-            prediction_text = ""
             
-            for p in paragraphs:
+            # --- Extract AI Munafa prediction value from <h3> tags ---
+            for h3 in soup.find_all('h3'):
+                h3_text = h3.get_text(strip=True)
+                if 'AI Munafa prediction value' in h3_text:
+                    # e.g. "AI Munafa prediction value: 50 as on Mon 06 April 2026"
+                    result["ai_prediction"] = h3_text
+                    # The explanation note is the next sibling paragraph
+                    next_p = h3.find_next_sibling('p')
+                    if next_p:
+                        result["ai_prediction_note"] = next_p.get_text(strip=True)
+                    break
+            
+            # --- Extract "Tomorrow's movement Prediction of..." dialogue paragraphs ---
+            dialogue_paragraphs = []
+            for p in soup.find_all('p'):
                 txt = p.get_text(strip=True)
-                # Filter out garbage tags or short UI strings, looking for actual analysis paragraphs
-                if len(txt) > 80 and "AdBlock" not in txt and "MunafaSutra" not in txt:
-                    prediction_text += txt + "\n\n"
-                    if len(prediction_text) > 1000:
-                        prediction_text = prediction_text[:1000] + "..."
-                        break
+                if txt.startswith("Tomorrow's movement Prediction of"):
+                    dialogue_paragraphs.append(txt)
+            result["dialogue"] = dialogue_paragraphs
             
-            if prediction_text:
-                return prediction_text.strip()
-            return "No readable prediction paragraphs available on MunafaSutra."
+            return result
         else:
-            return f"Failed to fetch data (Status Code: {resp.status_code})"
+            result["ai_prediction"] = f"Failed to fetch data (Status Code: {resp.status_code})"
+            return result
     except Exception as e:
-        return f"Error fetching MunafaSutra prediction: {e}"
+        return {"url": f"https://munafasutra.com/nse/tomorrow/{ticker}", "ai_prediction": f"Error: {e}", "ai_prediction_note": None, "dialogue": []}
 
 def frac_diff_ffd(series, d=0.4, thresh=1e-5):
     """Fixed-Width Window Fractional Differencing (Lopez de Prado)."""
@@ -1041,8 +1054,66 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
             
             with st.expander(f"🔮 View Munafa Sutra Prediction for {symbol}", expanded=False):
                 with st.spinner("Fetching prediction from Munafa Sutra..."):
-                    munafa_pred = fetch_munafasutra_prediction(ticker_input).replace('\n', '<br>')
-                    st.markdown(f"<div style='padding:1rem; border-radius:8px; background-color:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05);'><p style='color: black; font-size: 1rem; line-height: 1.6;'>{munafa_pred}</p></div>", unsafe_allow_html=True)
+                    munafa_data = fetch_munafasutra_prediction(ticker_input)
+                    munafa_url = munafa_data.get("url", "")
+                    munafa_ai = munafa_data.get("ai_prediction", "")
+                    munafa_note = munafa_data.get("ai_prediction_note", "")
+                    munafa_dialogues = munafa_data.get("dialogue", [])
+                    
+                    # --- Page link ---
+                    st.markdown(
+                        f"<p style='margin-bottom: 0.75rem;'>🔗 <a href='{munafa_url}' target='_blank' style='color:#1D4ED8; font-weight:600;'>{munafa_url}</a></p>",
+                        unsafe_allow_html=True
+                    )
+                    
+                    # --- AI Munafa prediction value ---
+                    if munafa_ai:
+                        ai_label = munafa_ai.replace("AI Munafa prediction value:", "").strip() if ":" in munafa_ai else munafa_ai
+                        # Try to extract numeric value for colour coding
+                        import re as _re
+                        val_match = _re.search(r':\s*(\d+)', munafa_ai)
+                        ai_num = int(val_match.group(1)) if val_match else None
+                        if ai_num is not None:
+                            if ai_num >= 60:
+                                ai_color = "#00C073"
+                            elif ai_num <= 40:
+                                ai_color = "#FF2B2B"
+                            else:
+                                ai_color = "#F59E0B"
+                        else:
+                            ai_color = "#555"
+                        st.markdown(
+                            f"""
+                            <div style='padding: 0.75rem 1rem; border-radius: 8px; background-color: rgba(0,0,0,0.03);
+                                        border: 1px solid rgba(0,0,0,0.08); margin-bottom: 0.75rem;'>
+                                <p style='margin:0; font-size:0.78rem; font-weight:700; text-transform:uppercase;
+                                           color:#888; letter-spacing:0.05em;'>AI Munafa Prediction Value</p>
+                                <p style='margin:4px 0 0 0; font-size:1.25rem; font-weight:700; color:{ai_color};'>{ai_label}</p>
+                                {f"<p style='margin:4px 0 0 0; font-size:0.9rem; color:#555;'>{munafa_note}</p>" if munafa_note else ""}
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+                    
+                    # --- Tomorrow's movement Prediction dialogue ---
+                    if munafa_dialogues:
+                        dialogue_html = "".join(
+                            f"<p style='margin: 0 0 0.6rem 0; font-size: 0.97rem; line-height: 1.65; color: black;'>{d}</p>"
+                            for d in munafa_dialogues
+                        )
+                        st.markdown(
+                            f"""
+                            <div style='padding: 0.75rem 1rem; border-radius: 8px; background-color: rgba(0,0,0,0.02);
+                                        border: 1px solid rgba(0,0,0,0.06);'>
+                                <p style='margin:0 0 0.5rem 0; font-size:0.78rem; font-weight:700;
+                                           text-transform:uppercase; color:#888; letter-spacing:0.05em;'>Tomorrow's Movement Prediction</p>
+                                {dialogue_html}
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+                    elif not munafa_ai:
+                        st.markdown("<p style='color:#888;'>No prediction data available from Munafa Sutra.</p>", unsafe_allow_html=True)
             
         except Exception as e:
             if render_ui:

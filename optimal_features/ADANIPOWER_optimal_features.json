@@ -1,15 +1,14 @@
 {
-    "ticker": "CANBK",
+    "ticker": "ADANIPOWER",
     "exchange": "NSE",
     "top_combinations": [
         {
             "rank": 1,
-            "accuracy": 0.7789,
+            "accuracy": 0.6737,
             "features": [
                 "Closing_Momentum",
-                "Distance_to_Fast_SMA",
                 "ATR_Percent",
-                "Daily_RSI_14",
+                "Frac_Diff_Close",
                 "Gap_Percentage"
             ],
             "dataset_rows": 473,
@@ -17,13 +16,12 @@
         },
         {
             "rank": 2,
-            "accuracy": 0.7474,
+            "accuracy": 0.6737,
             "features": [
                 "Closing_Momentum",
-                "Distance_to_Fast_SMA",
+                "ATR_Percent",
                 "Daily_RSI_14",
-                "Nifty_RSI_14",
-                "Nifty_Trend_Dist",
+                "Frac_Diff_Close",
                 "Gap_Percentage"
             ],
             "dataset_rows": 473,
@@ -31,11 +29,11 @@
         },
         {
             "rank": 3,
-            "accuracy": 0.7368,
+            "accuracy": 0.6737,
             "features": [
                 "Closing_Momentum",
-                "Distance_to_Fast_SMA",
-                "Daily_RSI_14",
+                "ATR_Percent",
+                "Frac_Diff_Close",
                 "Nifty_Trend_Dist",
                 "Gap_Percentage"
             ],
