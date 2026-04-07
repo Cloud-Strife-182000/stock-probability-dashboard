@@ -370,6 +370,7 @@ def evaluate_custom_features(ticker_input, exchange, selected_features):
         baseline_accuracy = 0.0
         true_edge = 0.0
         latest_result_html = ""
+        regime_sync_score = "N/A"
         hist_long_pct = 0.0
         hist_short_pct = 0.0
         ml_pred_label = ""
@@ -449,8 +450,10 @@ def evaluate_custom_features(ticker_input, exchange, selected_features):
                 val_count = len(eval_results)
                 latest_result_html = f"<div style='margin-bottom: 8px;'><b style='color: black;'>Recent Regime Sync: {correct_count}/{val_count} Correct</b></div>"
                 latest_result_html += f"<ul style='list-style-type: none; padding-left: 0; margin: 0; font-size: 0.95rem;'>" + "".join(eval_results) + "</ul>"
+                regime_sync_score = f"{correct_count}/{val_count} Correct"
             else:
                 latest_result_html = "<span>Not enough data for 5-Day Validation.</span>"
+                regime_sync_score = "N/A"
             
             model = clone(base_ensemble)
             
@@ -511,6 +514,7 @@ def evaluate_custom_features(ticker_input, exchange, selected_features):
             "ml_color": ml_color,
             "ml_bg_color": ml_bg_color,
             "latest_result_html": latest_result_html,
+            "regime_sync_score": regime_sync_score,
             "features_used": ", ".join([{v: k for k, v in FEATURE_MAP.items()}.get(f, f) for f in selected_features])
         }
     except Exception as e:
@@ -1240,6 +1244,7 @@ with tab3:
                                         "Exchange": b_exch,
                                         "Highest Prob (%)": round(res.get("prob_pct", 0.0), 1),
                                         "Prediction": res.get("ml_pred_label", "N/A"),
+                                        "5-Day Regime Sync": res.get("regime_sync_score", "N/A"),
                                         "Test Accuracy (%)": round(res.get("test_accuracy", 0.0), 1),
                                         "True Edge (%)": round(res.get("true_edge", 0.0), 1),
                                         "Features Used": ", ".join(b_feats),

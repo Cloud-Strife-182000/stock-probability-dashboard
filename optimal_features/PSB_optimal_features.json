@@ -4,25 +4,27 @@
     "top_combinations": [
         {
             "rank": 1,
-            "accuracy": 0.6421,
+            "accuracy": 0.6737,
             "features": [
                 "Closing_Momentum",
                 "Distance_to_Fast_SMA",
                 "ATR_Percent",
                 "VWAP_Distance",
-                "Nifty_Momentum",
-                "Nifty_RSI_14",
+                "OFI",
                 "Gap_Percentage"
             ],
-            "dataset_rows": 472,
+            "dataset_rows": 473,
             "out_of_sample_size": 95
         },
         {
             "rank": 2,
-            "accuracy": 0.6316,
+            "accuracy": 0.6737,
             "features": [
-                "OBV_Slope",
+                "Distance_to_Fast_SMA",
                 "ATR_Percent",
+                "VWAP_Distance",
+                "OFI",
+                "Nifty_Momentum",
                 "Gap_Percentage"
             ],
             "dataset_rows": 473,
@@ -30,12 +32,13 @@
         },
         {
             "rank": 3,
-            "accuracy": 0.6211,
+            "accuracy": 0.6632,
             "features": [
                 "Closing_Momentum",
-                "OBV_Slope",
                 "ATR_Percent",
-                "Gap_Percentage"
+                "VWAP_Distance",
+                "OFI",
+                "US_Overnight_Return"
             ],
             "dataset_rows": 473,
             "out_of_sample_size": 95
