@@ -1,38 +1,36 @@
 {
-    "ticker": "PNB",
+    "ticker": "IDBI",
     "exchange": "NSE",
     "top_combinations": [
         {
             "rank": 1,
-            "accuracy": 0.6737,
+            "accuracy": 0.6316,
             "features": [
-                "OBV_Slope",
-                "OFI",
-                "Nifty_Momentum",
-                "Nifty_RSI_14"
+                "ATR_Percent",
+                "Gap_Percentage"
             ],
             "dataset_rows": 473,
             "out_of_sample_size": 95
         },
         {
             "rank": 2,
-            "accuracy": 0.6632,
+            "accuracy": 0.6316,
             "features": [
-                "OFI",
-                "Nifty_Momentum"
+                "Closing_Momentum",
+                "ATR_Percent",
+                "Gap_Percentage",
+                "US_Overnight_Return"
             ],
             "dataset_rows": 473,
             "out_of_sample_size": 95
         },
         {
             "rank": 3,
-            "accuracy": 0.6526,
+            "accuracy": 0.6211,
             "features": [
-                "OFI",
-                "Frac_Diff_Close",
+                "ATR_Percent",
                 "Nifty_Momentum",
-                "Nifty_RSI_14",
-                "Nifty_Trend_Dist"
+                "Gap_Percentage"
             ],
             "dataset_rows": 473,
             "out_of_sample_size": 95

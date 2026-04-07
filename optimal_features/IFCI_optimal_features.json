@@ -1,41 +1,42 @@
 {
-    "ticker": "ADANIPOWER",
+    "ticker": "IFCI",
     "exchange": "NSE",
     "top_combinations": [
         {
             "rank": 1,
-            "accuracy": 0.6737,
+            "accuracy": 0.6947,
             "features": [
                 "Closing_Momentum",
                 "ATR_Percent",
-                "Frac_Diff_Close",
-                "Gap_Percentage"
+                "VWAP_Distance",
+                "Nifty_Momentum",
+                "US_Overnight_Return"
             ],
             "dataset_rows": 473,
             "out_of_sample_size": 95
         },
         {
             "rank": 2,
-            "accuracy": 0.6737,
+            "accuracy": 0.6842,
             "features": [
                 "Closing_Momentum",
                 "ATR_Percent",
-                "Daily_RSI_14",
-                "Frac_Diff_Close",
-                "Gap_Percentage"
+                "OFI",
+                "Nifty_RSI_14",
+                "US_Overnight_Return"
             ],
             "dataset_rows": 473,
             "out_of_sample_size": 95
         },
         {
             "rank": 3,
-            "accuracy": 0.6737,
+            "accuracy": 0.6842,
             "features": [
                 "Closing_Momentum",
-                "ATR_Percent",
-                "Frac_Diff_Close",
-                "Nifty_Trend_Dist",
-                "Gap_Percentage"
+                "OFI",
+                "Nifty_Momentum",
+                "Nifty_RSI_14",
+                "US_Overnight_Return"
             ],
             "dataset_rows": 473,
             "out_of_sample_size": 95

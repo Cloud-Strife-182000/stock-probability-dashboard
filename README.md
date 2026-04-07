@@ -4,7 +4,7 @@ A powerful, interactive Streamlit application configured to dynamically fetch li
 
 ## Core Architecture & Features
 
-- **Sustained 730-Day Hourly Engine:** The system extracts up to 2 years of 1-hour interval data directly from `yfinance`, explicitly targeting the 9:15 AM to 10:15 AM morning session to capture structural opening hour momentum. The model predicts whether the 10:15 AM close will be higher than the 9:15 AM open.
+- **Sustained 730-Day Hourly Engine:** The system extracts up to 2 years of 1-hour interval data directly from `yfinance`, explicitly targeting the 9:15 AM to 10:15 AM morning session to capture structural opening hour momentum. The model predicts whether the 10:15 AM open will be higher than the 9:15 AM open.
 - **Dynamic Feature Selection UI:** Users can interactively toggle 13 distinct technical and macro features (such as Order Flow Imbalance, VWAP Distance, Fractional Differencing, Gap Percentage, NIFTY 50 macro trends, and S&P 500 overnight sentiment) to instantly re-train the Random Forest model directly within the Streamlit interface.
 - **Macroscopic Indicator Merging:** Integrates broad market indices (`^NSEI` for local sentiment and `^GSPC` for overnight US sentiment) to inform the predictive matrix with external risk-on/risk-off regimes.
 - **Random Forest Ensemble:** Utilizes a robust `RandomForestClassifier` (`n_estimators=100`, class balancing, and leaf regulations) to predict binary outcomes for targeted intraday thresholds without overfitting simple sequences.

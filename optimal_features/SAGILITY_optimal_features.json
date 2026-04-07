@@ -1,0 +1,49 @@
+{
+    "ticker": "SAGILITY",
+    "exchange": "NSE",
+    "top_combinations": [
+        {
+            "rank": 1,
+            "accuracy": 0.7778,
+            "features": [
+                "Distance_to_Fast_SMA",
+                "OFI",
+                "Frac_Diff_Close",
+                "Nifty_RSI_14",
+                "US_Overnight_Return"
+            ],
+            "dataset_rows": 132,
+            "out_of_sample_size": 27
+        },
+        {
+            "rank": 2,
+            "accuracy": 0.7778,
+            "features": [
+                "Distance_to_Fast_SMA",
+                "ATR_Percent",
+                "VWAP_Distance",
+                "OFI",
+                "Frac_Diff_Close",
+                "Nifty_Momentum",
+                "US_Overnight_Return"
+            ],
+            "dataset_rows": 132,
+            "out_of_sample_size": 27
+        },
+        {
+            "rank": 3,
+            "accuracy": 0.7778,
+            "features": [
+                "Distance_to_Fast_SMA",
+                "Daily_RSI_14",
+                "VWAP_Distance",
+                "OFI",
+                "Frac_Diff_Close",
+                "Nifty_Momentum",
+                "US_Overnight_Return"
+            ],
+            "dataset_rows": 132,
+            "out_of_sample_size": 27
+        }
+    ]
+}

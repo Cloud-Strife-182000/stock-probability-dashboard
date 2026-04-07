@@ -340,9 +340,9 @@ def evaluate_custom_features(ticker_input, exchange, selected_features):
             candle_1015 = group[group['TimeStr'] == '10:15']
             if candle_915.empty or candle_1015.empty:
                 continue
-            open_price = candle_915.iloc[0]['Open']
-            close_price = candle_1015.iloc[0]['Close']
-            if close_price > open_price:
+            open_price_915 = candle_915.iloc[0]['Open']
+            open_price_1015 = candle_1015.iloc[0]['Open']
+            if open_price_1015 > open_price_915:
                 daily_targets[date_str] = 1.0
             else:
                 daily_targets[date_str] = -1.0
@@ -643,10 +643,10 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                 if candle_915.empty or candle_1015.empty:
                     continue  # Skip days where either key candle is missing
                     
-                open_price = candle_915.iloc[0]['Open']
-                close_price = candle_1015.iloc[0]['Close']
+                open_price_915 = candle_915.iloc[0]['Open']
+                open_price_1015 = candle_1015.iloc[0]['Open']
                 
-                if close_price > open_price:
+                if open_price_1015 > open_price_915:
                     daily_targets[date_str] = 1.0
                 else:
                     daily_targets[date_str] = -1.0
@@ -784,7 +784,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                     last_x_date = ml_df.iloc[-1]['DateStr']
                     last_x_target_date = date_to_next_date.get(last_x_date, "")
                     
-                    # If today's 10:15 close exists in the dataset and was assigned as a target,
+                    # If today's 10:15 open exists in the dataset and was assigned as a target,
                     # the final row in X holds today's true target. We must exclude it
                     # from the training set to avoid data leakage!
                     if last_x_target_date == today_ist_str:
@@ -956,7 +956,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                             <p style="margin: 0; font-size: 1rem; color: #555; text-transform: uppercase; font-weight: 600; margin-bottom: 10px;">5-Day Walk-Forward Validation</p>
                             <div style="text-align: left; padding: 8px; border-radius: 6px; border: 1px solid #DDD; display: inline-block;">{latest_result_html}</div>
                         </div>
-                        <p style="color: {ml_color}; font-size: 1.1rem; margin-top: 20px;"><em>Multi-class Random Forest Matrix targeting sustained (10:15 AM) close thresholds</em></p>
+                        <p style="color: {ml_color}; font-size: 1.1rem; margin-top: 20px;"><em>Multi-class Random Forest Matrix targeting sustained (10:15 AM) open thresholds</em></p>
                     </div>
                     """,
                     unsafe_allow_html=True
@@ -1011,7 +1011,7 @@ def render_main_dashboard(ticker_input, exchange, selected_features, render_ui=T
                         st.dataframe(styled_corr, use_container_width=True)
                         
                     with st.expander("View Raw Hourly Machine Learning Training Data", expanded=False):
-                        st.markdown("This targeted intraday matrix maps exclusively the final hourly closing datasets evaluated natively across 730 days exactly against the sustained 10:15 AM close target thresholds:")
+                        st.markdown("This targeted intraday matrix maps exclusively the final hourly closing datasets evaluated natively across 730 days exactly against the sustained 10:15 AM open target thresholds:")
                         display_df = ml_df[selected_features + ['Target', 'DateStr']].copy()
                         
                         # Apply the same exact training boundary cut-off to reflect the true model state without leaks

@@ -198,10 +198,10 @@ def prepare_data(ticker, exchange):
         if candle_915.empty or candle_1015.empty:
             continue
             
-        open_price = candle_915.iloc[0]['Open']
-        close_price = candle_1015.iloc[0]['Close']
+        open_price_915 = candle_915.iloc[0]['Open']
+        open_price_1015 = candle_1015.iloc[0]['Open']
         
-        if close_price > open_price:
+        if open_price_1015 > open_price_915:
             daily_targets[date_str] = 1.0
         else:
             daily_targets[date_str] = -1.0

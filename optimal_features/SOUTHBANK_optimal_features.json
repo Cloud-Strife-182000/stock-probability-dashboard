@@ -1,23 +1,28 @@
 {
-    "ticker": "WIPRO",
+    "ticker": "SOUTHBANK",
     "exchange": "NSE",
     "top_combinations": [
         {
             "rank": 1,
-            "accuracy": 0.6421,
+            "accuracy": 0.6737,
             "features": [
                 "Closing_Momentum",
                 "OBV_Slope",
-                "ATR_Percent"
+                "Distance_to_Fast_SMA",
+                "Daily_RSI_14",
+                "OFI",
+                "US_Overnight_Return"
             ],
             "dataset_rows": 473,
             "out_of_sample_size": 95
         },
         {
             "rank": 2,
-            "accuracy": 0.6316,
+            "accuracy": 0.6632,
             "features": [
-                "Gap_Percentage",
+                "Closing_Momentum",
+                "Daily_RSI_14",
+                "Nifty_Momentum",
                 "US_Overnight_Return"
             ],
             "dataset_rows": 473,
@@ -25,14 +30,16 @@
         },
         {
             "rank": 3,
-            "accuracy": 0.6211,
+            "accuracy": 0.6632,
             "features": [
                 "Closing_Momentum",
                 "OBV_Slope",
+                "Distance_to_Fast_SMA",
                 "Daily_RSI_14",
-                "VWAP_Distance"
+                "Nifty_Momentum",
+                "US_Overnight_Return"
             ],
-            "dataset_rows": 472,
+            "dataset_rows": 473,
             "out_of_sample_size": 95
         }
     ]
